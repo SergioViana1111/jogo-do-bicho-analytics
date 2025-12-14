@@ -1,23 +1,23 @@
 """
-Módulo de banco de dados SQLite para persistência de dados
-O banco é interno, simples e invisível ao usuário
+Módulo de banco de dados para persistência de dados
+Usa SQLite in-memory para Streamlit Cloud (filesystem read-only)
 """
 import sqlite3
 import pandas as pd
 from datetime import datetime
-from pathlib import Path
+import streamlit as st
 
-# Caminho do banco de dados (na mesma pasta do projeto)
-DB_PATH = Path(__file__).parent.parent / "data" / "jogo_bicho.db"
-
+# Usar banco de dados em memória que é armazenado no session_state
 def get_connection():
-    """Retorna conexão com o banco de dados"""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    """Retorna conexão com o banco de dados em memória"""
+    # Usar connection persistente no session_state
+    if '_db_conn' not in st.session_state:
+        st.session_state._db_conn = sqlite3.connect(':memory:', check_same_thread=False)
+        _init_tables(st.session_state._db_conn)
+    return st.session_state._db_conn
 
-def init_database():
-    """Inicializa o banco de dados com as tabelas necessárias"""
-    conn = get_connection()
+def _init_tables(conn):
+    """Inicializa as tabelas no banco de dados"""
     cursor = conn.cursor()
     
     # Tabela principal de resultados
@@ -42,9 +42,12 @@ def init_database():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_loteria_data ON resultados(loteria, data)')
     
     conn.commit()
-    conn.close()
 
-def insert_resultados(df: pd.DataFrame) -> tuple[int, int]:
+def init_database():
+    """Inicializa o banco de dados - apenas dispara get_connection"""
+    get_connection()
+
+def insert_resultados(df: pd.DataFrame) -> tuple:
     """
     Insere resultados no banco de dados.
     Retorna (inseridos, duplicados)
@@ -91,82 +94,91 @@ def insert_resultados(df: pd.DataFrame) -> tuple[int, int]:
             duplicados += 1
     
     conn.commit()
-    conn.close()
     
     return inseridos, duplicados
 
 def load_all_data() -> pd.DataFrame:
     """Carrega todos os dados do banco de dados"""
-    conn = get_connection()
-    
-    df = pd.read_sql_query('''
-        SELECT data, loteria, horario, grupo, centena, milhar, animal
-        FROM resultados
-        ORDER BY data DESC, horario
-    ''', conn)
-    
-    conn.close()
-    
-    if len(df) > 0:
-        df['data'] = pd.to_datetime(df['data'])
-    
-    return df
+    try:
+        conn = get_connection()
+        
+        df = pd.read_sql_query('''
+            SELECT data, loteria, horario, grupo, centena, milhar, animal
+            FROM resultados
+            ORDER BY data DESC, horario
+        ''', conn)
+        
+        if len(df) > 0:
+            df['data'] = pd.to_datetime(df['data'])
+        
+        return df
+    except Exception as e:
+        print(f"Erro ao carregar dados: {e}")
+        return pd.DataFrame()
 
 def load_data_by_loteria(loteria: str) -> pd.DataFrame:
     """Carrega dados de uma loteria específica"""
-    conn = get_connection()
-    
-    df = pd.read_sql_query('''
-        SELECT data, loteria, horario, grupo, centena, milhar, animal
-        FROM resultados
-        WHERE loteria = ?
-        ORDER BY data DESC, horario
-    ''', conn, params=(loteria,))
-    
-    conn.close()
-    
-    if len(df) > 0:
-        df['data'] = pd.to_datetime(df['data'])
-    
-    return df
+    try:
+        conn = get_connection()
+        
+        df = pd.read_sql_query('''
+            SELECT data, loteria, horario, grupo, centena, milhar, animal
+            FROM resultados
+            WHERE loteria = ?
+            ORDER BY data DESC, horario
+        ''', conn, params=(loteria,))
+        
+        if len(df) > 0:
+            df['data'] = pd.to_datetime(df['data'])
+        
+        return df
+    except Exception as e:
+        print(f"Erro ao carregar dados: {e}")
+        return pd.DataFrame()
 
 def get_unique_loterias() -> list:
     """Retorna lista de loterias únicas no banco"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT DISTINCT loteria FROM resultados ORDER BY loteria')
-    loterias = [row[0] for row in cursor.fetchall()]
-    
-    conn.close()
-    return loterias
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT DISTINCT loteria FROM resultados ORDER BY loteria')
+        loterias = [row[0] for row in cursor.fetchall()]
+        
+        return loterias
+    except Exception as e:
+        print(f"Erro ao buscar loterias: {e}")
+        return []
 
 def get_record_count() -> int:
     """Retorna total de registros no banco"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM resultados')
-    count = cursor.fetchone()[0]
-    
-    conn.close()
-    return count
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM resultados')
+        count = cursor.fetchone()[0]
+        
+        return count
+    except Exception as e:
+        print(f"Erro ao contar registros: {e}")
+        return 0
 
 def delete_old_data(days_to_keep: int = 30):
     """Remove dados mais antigos que X dias (para manutenção)"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        DELETE FROM resultados 
-        WHERE data < date('now', ?)
-    ''', (f'-{days_to_keep} days',))
-    
-    deleted = cursor.rowcount
-    conn.commit()
-    conn.close()
-    
-    return deleted
-
-# Inicializar banco ao importar o módulo
-init_database()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM resultados 
+            WHERE data < date('now', ?)
+        ''', (f'-{days_to_keep} days',))
+        
+        deleted = cursor.rowcount
+        conn.commit()
+        
+        return deleted
+    except Exception as e:
+        print(f"Erro ao deletar dados: {e}")
+        return 0
