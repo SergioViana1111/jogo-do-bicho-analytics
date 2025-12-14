@@ -135,20 +135,23 @@ def _insert_supabase(df: pd.DataFrame) -> tuple:
                 'animal': row.get('animal', '')
             }
             
-            # Tentar inserir (upsert não duplica)
-            result = client.table('resultados').upsert(
-                record, 
-                on_conflict='data,loteria,horario,milhar'
-            ).execute()
+            # Usar INSERT simples (não upsert)
+            result = client.table('resultados').insert(record).execute()
             
             if result.data:
                 inseridos += 1
+                print(f"[DB] Inserido: {record['milhar']} G.{record['grupo']}")
             else:
                 duplicados += 1
                 
         except Exception as e:
-            print(f"[DB] Erro Supabase insert: {e}")
-            duplicados += 1
+            error_msg = str(e)
+            if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                duplicados += 1
+                print(f"[DB] Duplicado: {record['milhar']}")
+            else:
+                print(f"[DB] Erro Supabase: {e}")
+                duplicados += 1
     
     print(f"[DB] Supabase: {inseridos} inseridos, {duplicados} duplicados")
     return inseridos, duplicados
