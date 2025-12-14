@@ -5,14 +5,13 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 
-# Importar módulo de banco de dados
-from modules.database import load_all_data, insert_resultados, get_record_count
-
 def load_data_from_database():
     """
     Carrega dados do banco de dados SQLite.
     Esta é a fonte primária de dados para persistência.
     """
+    # Import lazy para evitar import circular
+    from modules.database import load_all_data
     return load_all_data()
 
 def save_data_to_database(df: pd.DataFrame) -> tuple[int, int]:
@@ -20,6 +19,8 @@ def save_data_to_database(df: pd.DataFrame) -> tuple[int, int]:
     Salva dados no banco de dados SQLite.
     Retorna (inseridos, duplicados)
     """
+    # Import lazy para evitar import circular
+    from modules.database import insert_resultados
     return insert_resultados(df)
 
 # Colunas obrigatórias da planilha
