@@ -233,25 +233,30 @@ if processar and resultados_texto:
         
         # Botão para adicionar à base
         if st.button("➕ ADICIONAR À BASE DE DADOS", type="primary"):
-            # Preparar dados para adicionar
-            df_add = df_novos[['data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']].copy()
-            df_add['data'] = pd.to_datetime(df_add['data'])
-            
-            # Salvar no banco de dados SQLite (persistência)
-            inseridos, duplicados = save_data_to_database(df_add)
-            
-            # Recarregar dados do banco para session_state
-            st.session_state.dados = load_data_from_database()
-            st.session_state.dados_loaded = True
-            
-            if inseridos > 0:
-                st.success(f"✅ {inseridos} registros salvos! Total: {len(st.session_state.dados)} registros.")
-                st.toast("Dados salvos com sucesso!", icon="✅")
-            if duplicados > 0:
-                st.warning(f"⚠️ {duplicados} registros já existiam e foram ignorados.")
-            
-            # Forçar rerun para atualizar o estado em todas as páginas
-            st.rerun()
+            try:
+                # Preparar dados para adicionar
+                df_add = df_novos[['data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']].copy()
+                df_add['data'] = pd.to_datetime(df_add['data'])
+                
+                # Salvar no banco de dados
+                inseridos, duplicados = save_data_to_database(df_add)
+                
+                # Recarregar dados do banco para session_state
+                st.session_state.dados = load_data_from_database()
+                st.session_state.dados_loaded = True
+                
+                if inseridos > 0:
+                    st.success(f"✅ {inseridos} registros salvos! Total: {len(st.session_state.dados)} registros.")
+                    st.balloons()
+                if duplicados > 0:
+                    st.info(f"ℹ️ {duplicados} registros já existiam.")
+                    
+                # Mostrar dados salvos
+                st.markdown("### ✅ Dados no Banco")
+                st.dataframe(st.session_state.dados.head(10), use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"❌ Erro ao salvar: {str(e)}")
         
         st.markdown('</div>', unsafe_allow_html=True)
     
