@@ -242,14 +242,16 @@ if processar and resultados_texto:
             
             # Recarregar dados do banco para session_state
             st.session_state.dados = load_data_from_database()
+            st.session_state.dados_loaded = True
             
             if inseridos > 0:
-                st.success(f"✅ {inseridos} registros salvos no banco de dados! Total: {len(st.session_state.dados)} registros.")
-                st.balloons()
+                st.success(f"✅ {inseridos} registros salvos! Total: {len(st.session_state.dados)} registros.")
+                st.toast("Dados salvos com sucesso!", icon="✅")
             if duplicados > 0:
                 st.warning(f"⚠️ {duplicados} registros já existiam e foram ignorados.")
             
-            # Dados persistidos - sobrevivem a reloads
+            # Forçar rerun para atualizar o estado em todas as páginas
+            st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
     
