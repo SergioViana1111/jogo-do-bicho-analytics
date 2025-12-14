@@ -139,6 +139,7 @@ def get_day_color(day_number: int) -> dict:
 def get_grupo_days(df: pd.DataFrame, loteria: str, grupo: int) -> list:
     """
     Retorna os números dos dias (1-5) em que um grupo específico apareceu.
+    Se o grupo apareceu múltiplas vezes no mesmo dia, retorna o dia repetido.
     
     Args:
         df: DataFrame com todos os dados
@@ -146,7 +147,7 @@ def get_grupo_days(df: pd.DataFrame, loteria: str, grupo: int) -> list:
         grupo: Número do grupo (1-25)
     
     Returns:
-        Lista de números de dias (1-5) em que o grupo apareceu
+        Lista de números de dias (1-5), podendo ter repetições se apareceu várias vezes
     """
     df_5dias = filter_5_day_cycle(df, loteria)
     
@@ -159,14 +160,17 @@ def get_grupo_days(df: pd.DataFrame, loteria: str, grupo: int) -> list:
     if len(df_grupo) == 0:
         return []
     
-    # Obter dias únicos em que o grupo apareceu
-    dias = set()
-    for data in df_grupo['data'].dt.date.unique():
+    # Obter dias para cada aparição (incluindo repetições)
+    dias = []
+    for _, row in df_grupo.iterrows():
+        data = row['data']
+        if hasattr(data, 'date'):
+            data = data.date()
         dia_num = get_day_number(df, loteria, data)
         if dia_num > 0:
-            dias.add(dia_num)
+            dias.append(dia_num)
     
-    return sorted(list(dias))
+    return sorted(dias)
 
 def validate_dataframe(df: pd.DataFrame) -> tuple[bool, str]:
     """
