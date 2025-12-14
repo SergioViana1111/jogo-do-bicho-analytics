@@ -175,11 +175,24 @@ if processar and resultados_texto:
             centena = milhar % 1000
             
             # Extrair grupo
-            grupo_match = re.search(r'G\.?(\d+)|grupo\s*(\d+)', linha_limpa, re.IGNORECASE)
+            # Formatos suportados: G.10, G10, grupo 10, ou apenas número após o milhar
+            grupo = None
+            grupo_match = re.search(r'G\.?\s*(\d{1,2})\b|grupo\s*(\d{1,2})', linha_limpa, re.IGNORECASE)
             if grupo_match:
                 grupo = int(grupo_match.group(1) or grupo_match.group(2))
             else:
-                # Tentar deduzir do animal
+                # Tentar formato "milhar grupo animal" (ex: "3640 10 COELHO")
+                # Procurar número após o milhar que seja 1-25
+                parts = linha_limpa.split()
+                for part in parts[1:]:  # Pular o primeiro (milhar)
+                    if part.isdigit():
+                        num = int(part)
+                        if 1 <= num <= 25:
+                            grupo = num
+                            break
+            
+            if grupo is None:
+                # Tentar deduzir do nome do animal
                 for animal_nome, animal_grupo in ANIMAIS_GRUPOS.items():
                     if animal_nome in linha_limpa.upper():
                         grupo = animal_grupo
