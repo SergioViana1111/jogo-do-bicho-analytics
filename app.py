@@ -135,18 +135,16 @@ if 'dados' not in st.session_state or st.session_state.dados is None or len(st.s
     st.markdown("""
     <div class="warning-box">
         <h3>⚠️ Nenhuma base de dados carregada</h3>
-        <p>Para começar, acesse o menu <strong>📤 Upload</strong> no menu lateral e carregue sua planilha de resultados.</p>
+        <p>Para começar, acesse o menu <strong>✨ Processador</strong> no menu lateral e insira os resultados manualmente.</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.info("""
-    **Formato esperado da planilha:**
-    - `data` - Data do resultado (YYYY-MM-DD)
-    - `loteria` - Nome da loteria (RJ, Nacional, Look GO, Federal, Capital)
-    - `horario` - Horário do sorteio
-    - `grupo` - Número do grupo (01-25)
-    - `centena` - Centena sorteada (000-999)
-    - `milhar` - Milhar sorteada (0000-9999)
+    **Como inserir resultados:**
+    - Acesse **✨ Processador** no menu lateral
+    - Selecione a data, loteria e horário
+    - Cole ou digite os resultados
+    - Clique em **Processar** e depois **Adicionar à Base**
     """)
     
     # Quick stats area

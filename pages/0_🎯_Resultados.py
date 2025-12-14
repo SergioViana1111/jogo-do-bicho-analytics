@@ -57,7 +57,7 @@ st.markdown("""
 st.title("🎯 Resultados por Loteria")
 
 if 'dados' not in st.session_state or st.session_state.dados is None:
-    st.warning("⚠️ Nenhuma base de dados carregada. Acesse a página **📤 Upload** primeiro.")
+    st.warning("⚠️ Nenhuma base de dados carregada. Acesse **✨ Processador** para inserir resultados.")
     st.stop()
 
 from modules.data_loader import (
