@@ -85,6 +85,7 @@ with col1:
     loteria_selecionada = st.selectbox(
         "🎰 Loteria:",
         loterias,
+        key="proc_loteria",
         help="Cada loteria é analisada separadamente. Nunca misturar dados entre loterias."
     )
     
@@ -99,7 +100,11 @@ with col1:
     
     # Seleção de horário (baseado na loteria selecionada)
     horarios_loteria = HORARIOS_POR_LOTERIA.get(loteria_selecionada, ["11:00", "14:00", "18:00", "21:00"])
-    horario_selecionado = st.selectbox("⏰ Horário:", horarios_loteria)
+    horario_selecionado = st.selectbox(
+        "⏰ Horário:", 
+        horarios_loteria,
+        key="proc_horario"
+    )
     
     # Mostrar informação sobre o dia calculado
     if 'dados' in st.session_state and st.session_state.dados is not None:
