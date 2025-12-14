@@ -223,8 +223,9 @@ if processar and resultados_texto:
         st.markdown('<div class="success-box">', unsafe_allow_html=True)
         st.success(f"✅ {len(resultados_processados)} resultados processados com sucesso!")
         
-        # Criar DataFrame
+        # Criar DataFrame e SALVAR no session_state
         df_novos = pd.DataFrame(resultados_processados)
+        st.session_state.df_processados = df_novos
         
         # Preview - Formatar números com zeros à esquerda para visualização
         st.markdown("### 📋 Resultados Processados")
@@ -248,9 +249,30 @@ if processar and resultados_texto:
             use_container_width=True,
             hide_index=True
         )
-        
-        # Botão para adicionar à base
-        if st.button("➕ ADICIONAR À BASE DE DADOS", type="primary"):
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Mostrar erros
+    if erros:
+        st.markdown('<div class="error-box">', unsafe_allow_html=True)
+        for erro in erros:
+            st.error(erro)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Mostrar dados processados salvos no session_state e botão de adicionar
+if 'df_processados' in st.session_state and st.session_state.df_processados is not None and len(st.session_state.df_processados) > 0:
+    df_novos = st.session_state.df_processados
+    
+    st.markdown("---")
+    st.markdown("### 📦 Dados Prontos para Adicionar")
+    
+    # Mostrar resumo
+    st.info(f"📊 **{len(df_novos)} registros** prontos para adicionar | Data: {df_novos['data'].iloc[0]} | Loteria: {df_novos['loteria'].iloc[0]} | Horário: {df_novos['horario'].iloc[0]}")
+    
+    # Botão para adicionar à base
+    col_add, col_cancel = st.columns(2)
+    
+    with col_add:
+        if st.button("➕ ADICIONAR À BASE DE DADOS", type="primary", use_container_width=True):
             try:
                 # Preparar dados para adicionar
                 df_add = df_novos[['data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']].copy()
@@ -263,27 +285,22 @@ if processar and resultados_texto:
                 st.session_state.dados = load_data_from_database()
                 st.session_state.dados_loaded = True
                 
+                # Limpar dados processados
+                st.session_state.df_processados = None
+                
                 if inseridos > 0:
                     st.success(f"✅ {inseridos} registros salvos! Total: {len(st.session_state.dados)} registros.")
                     st.balloons()
                 if duplicados > 0:
                     st.info(f"ℹ️ {duplicados} registros já existiam.")
-                    
-                # Mostrar dados salvos
-                st.markdown("### ✅ Dados no Banco")
-                st.dataframe(st.session_state.dados.head(10), use_container_width=True)
                 
             except Exception as e:
                 st.error(f"❌ Erro ao salvar: {str(e)}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Mostrar erros
-    if erros:
-        st.markdown('<div class="error-box">', unsafe_allow_html=True)
-        for erro in erros:
-            st.error(erro)
-        st.markdown('</div>', unsafe_allow_html=True)
+    with col_cancel:
+        if st.button("🗑️ CANCELAR", use_container_width=True):
+            st.session_state.df_processados = None
+            st.rerun()
 
 if limpar:
     st.rerun()
