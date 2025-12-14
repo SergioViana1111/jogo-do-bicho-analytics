@@ -81,16 +81,25 @@ with col1:
     )
     
     # Seleção de loteria (OBRIGATÓRIO - nunca misturar loterias)
-    loterias = ["RJ", "Nacional", "Look GO", "Federal", "Capital"]
+    loterias = ["Nacional", "Look GO", "Capital", "RJ", "Federal"]
     loteria_selecionada = st.selectbox(
         "🎰 Loteria:",
         loterias,
         help="Cada loteria é analisada separadamente. Nunca misturar dados entre loterias."
     )
     
-    # Seleção de horário
-    horarios_padrao = ["09:00", "11:00", "14:00", "16:00", "18:00", "21:00"]
-    horario_selecionado = st.selectbox("⏰ Horário:", horarios_padrao)
+    # Horários específicos por loteria (conforme documentação)
+    HORARIOS_POR_LOTERIA = {
+        "Nacional": ["02:00", "08:00", "10:00", "12:00", "15:00", "17:00", "21:00", "23:00"],
+        "Look GO": ["07:00", "09:00", "11:00", "14:00", "16:00", "21:00", "23:00"],
+        "Capital": ["10:00", "11:00", "13:00", "14:00", "16:00", "18:00", "20:00", "22:00"],
+        "RJ": ["11:00", "14:00", "16:00", "18:00", "21:00"],  # Horários comuns RJ
+        "Federal": ["19:00"],  # Federal tem horário único
+    }
+    
+    # Seleção de horário (baseado na loteria selecionada)
+    horarios_loteria = HORARIOS_POR_LOTERIA.get(loteria_selecionada, ["11:00", "14:00", "18:00", "21:00"])
+    horario_selecionado = st.selectbox("⏰ Horário:", horarios_loteria)
     
     # Mostrar informação sobre o dia calculado
     if 'dados' in st.session_state and st.session_state.dados is not None:
@@ -199,10 +208,17 @@ if processar and resultados_texto:
         # Criar DataFrame
         df_novos = pd.DataFrame(resultados_processados)
         
-        # Preview
+        # Preview - Formatar números com zeros à esquerda para visualização
         st.markdown("### 📋 Resultados Processados")
+        
+        # Criar cópia para exibição com formatação
+        df_display = df_novos.copy()
+        df_display['grupo'] = df_display['grupo'].apply(lambda x: f"{x:02d}")
+        df_display['centena'] = df_display['centena'].apply(lambda x: f"{x:03d}")
+        df_display['milhar'] = df_display['milhar'].apply(lambda x: f"{x:04d}")
+        
         st.dataframe(
-            df_novos[['data', 'loteria', 'horario', 'grupo', 'animal', 'centena', 'milhar']].rename(columns={
+            df_display[['data', 'loteria', 'horario', 'grupo', 'animal', 'centena', 'milhar']].rename(columns={
                 'data': 'Data',
                 'loteria': 'Loteria',
                 'horario': 'Horário',
