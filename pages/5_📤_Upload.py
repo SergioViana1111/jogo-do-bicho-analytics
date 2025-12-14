@@ -26,7 +26,7 @@ A planilha deve conter as seguintes colunas:
 
 st.divider()
 
-from modules.data_loader import load_file, LOTERIAS
+from modules.data_loader import load_file, LOTERIAS, save_data_to_database, load_data_from_database
 
 # Área de upload
 st.subheader("📁 Selecione o Arquivo")
@@ -42,11 +42,14 @@ if uploaded_file is not None:
         df, message = load_file(uploaded_file)
     
     if df is not None:
-        # Sucesso
+        # Sucesso no processamento
         st.success(message)
         
-        # Armazenar no session_state
-        st.session_state.dados = df
+        # Salvar no banco de dados SQLite
+        inseridos, duplicados = save_data_to_database(df)
+        
+        # Recarregar do banco para session_state
+        st.session_state.dados = load_data_from_database()
         
         st.divider()
         

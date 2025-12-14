@@ -118,8 +118,20 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Auto-carregar dados do banco de dados SQLite na inicialização
+from modules.data_loader import load_data_from_database
+
+# Sempre tentar carregar do banco de dados ao iniciar
+if 'dados_loaded' not in st.session_state:
+    db_data = load_data_from_database()
+    if len(db_data) > 0:
+        st.session_state.dados = db_data
+        st.session_state.dados_loaded = True
+    else:
+        st.session_state.dados_loaded = True
+
 # Verificar se há dados carregados
-if 'dados' not in st.session_state or st.session_state.dados is None:
+if 'dados' not in st.session_state or st.session_state.dados is None or len(st.session_state.dados) == 0:
     st.markdown("""
     <div class="warning-box">
         <h3>⚠️ Nenhuma base de dados carregada</h3>

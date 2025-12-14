@@ -1,10 +1,11 @@
 """
 Processador de Resultados - Cole e processe resultados automaticamente
+Sistema adaptado para o novo escopo com ciclo de 5 dias
 """
 import streamlit as st
 import pandas as pd
 import re
-from datetime import datetime
+from datetime import datetime, date
 
 st.set_page_config(page_title="Processador", page_icon="✨", layout="wide")
 
@@ -41,25 +42,19 @@ st.markdown("""
         margin: 10px 0;
     }
     
-    .day-input {
-        background: #f8f9fa;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 10px;
-    }
-    
-    .day-label {
-        color: #00C853;
-        font-weight: bold;
-        margin-bottom: 5px;
+    .info-alert {
+        background: rgba(33, 150, 243, 0.1);
+        border: 1px solid #2196F3;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("✨ Processador de Resultados")
 
-from modules.data_loader import GRUPOS_ANIMAIS
+from modules.data_loader import GRUPOS_ANIMAIS, DIA_CORES, get_day_number, save_data_to_database, load_data_from_database
 
 # Inverter mapeamento para buscar grupo pelo nome
 ANIMAIS_GRUPOS = {v.upper(): k for k, v in GRUPOS_ANIMAIS.items()}
@@ -72,41 +67,67 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Seleção de dia
-col1, col2 = st.columns([1, 3])
+# Layout principal
+col1, col2 = st.columns([1, 2])
+
 with col1:
-    dia_selecionado = st.radio(
-        "Escolha o dia para processar:",
-        ["DIA 1 (HOJE)", "DIA 2 (ONTEM)", "DIA 3", "DIA 4", "DIA 5"],
-        horizontal=False
+    st.subheader("📋 Informações do Resultado")
+    
+    # Data do resultado (usa data real, não seleção manual de dia)
+    data_resultado = st.date_input(
+        "📅 Data do Resultado:",
+        value=date.today(),
+        help="Selecione a data real do resultado. O sistema calculará automaticamente o número do dia (1-5)."
     )
+    
+    # Seleção de loteria (OBRIGATÓRIO - nunca misturar loterias)
+    loterias = ["RJ", "Nacional", "Look GO", "Federal", "Capital"]
+    loteria_selecionada = st.selectbox(
+        "🎰 Loteria:",
+        loterias,
+        help="Cada loteria é analisada separadamente. Nunca misturar dados entre loterias."
+    )
+    
+    # Seleção de horário
+    horarios_padrao = ["09:00", "11:00", "14:00", "16:00", "18:00", "21:00"]
+    horario_selecionado = st.selectbox("⏰ Horário:", horarios_padrao)
+    
+    # Mostrar informação sobre o dia calculado
+    if 'dados' in st.session_state and st.session_state.dados is not None:
+        dia_num = get_day_number(st.session_state.dados, loteria_selecionada, data_resultado)
+        if dia_num > 0:
+            cor_info = DIA_CORES[dia_num]
+            st.markdown(f"""
+            <div class="info-alert">
+                <strong>{cor_info['emoji']} Esta data será o DIA {dia_num}</strong><br>
+                <span style="color: {cor_info['cor']};">■</span> {cor_info['nome']}
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("📊 Esta será uma nova data no sistema.")
 
 with col2:
-    # Seleção de loteria para adicionar
-    loterias = ["RJ", "Nacional", "Look GO", "Federal", "Capital"]
-    loteria_selecionada = st.selectbox("Loteria:", loterias)
+    st.subheader("📝 Cole os Resultados")
     
-    horarios_padrao = ["09:00", "11:00", "14:00", "16:00", "18:00", "21:00"]
-    horario_selecionado = st.selectbox("Horário:", horarios_padrao)
-
-# Área de texto para colar resultados
-resultados_texto = st.text_area(
-    "Cole aqui os resultados:",
-    height=200,
-    placeholder="""Exemplo:
+    # Área de texto para colar resultados
+    resultados_texto = st.text_area(
+        "Resultados (uma linha por resultado):",
+        height=200,
+        placeholder="""Exemplo:
 1: 3.640 G.10 COELHO
 2: 9.140 G.10 ÁGUIA
 3: 4.476 G.19 PAVÃO
 4: 3.551 G.13 GALO
 5: 3.152 G.13 GALO"""
-)
+    )
 
-col1, col2 = st.columns(2)
+# Botões de ação
+col_btn1, col_btn2 = st.columns(2)
 
-with col1:
+with col_btn1:
     processar = st.button("✨ PROCESSAR E PREENCHER", type="primary", use_container_width=True)
 
-with col2:
+with col_btn2:
     limpar = st.button("🗑️ LIMPAR", use_container_width=True)
 
 st.info("💡 **Dica:** Cole os resultados completos. O sistema identifica automaticamente milhar, centena, grupo e animal!")
@@ -122,9 +143,6 @@ if processar and resultados_texto:
             continue
         
         try:
-            # Tentar extrair padrão "1: 3.640 G.10 COELHO"
-            # Regex para capturar milhar (com ou sem ponto), grupo e animal
-            
             # Limpar a linha
             linha_limpa = linha.strip()
             
@@ -159,23 +177,8 @@ if processar and resultados_texto:
             
             animal = GRUPOS_ANIMAIS.get(grupo, 'Desconhecido')
             
-            # Determinar data baseado no dia selecionado
-            hoje = datetime.now().date()
-            if "HOJE" in dia_selecionado or "DIA 1" in dia_selecionado:
-                data = hoje
-            elif "ONTEM" in dia_selecionado or "DIA 2" in dia_selecionado:
-                data = hoje - pd.Timedelta(days=1)
-            elif "DIA 3" in dia_selecionado:
-                data = hoje - pd.Timedelta(days=2)
-            elif "DIA 4" in dia_selecionado:
-                data = hoje - pd.Timedelta(days=3)
-            elif "DIA 5" in dia_selecionado:
-                data = hoje - pd.Timedelta(days=4)
-            else:
-                data = hoje
-            
             resultados_processados.append({
-                'data': data,
+                'data': data_resultado,
                 'loteria': loteria_selecionada,
                 'horario': horario_selecionado,
                 'grupo': grupo,
@@ -218,15 +221,19 @@ if processar and resultados_texto:
             df_add = df_novos[['data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']].copy()
             df_add['data'] = pd.to_datetime(df_add['data'])
             
-            if 'dados' in st.session_state and st.session_state.dados is not None:
-                # Concatenar com dados existentes
-                st.session_state.dados = pd.concat([st.session_state.dados, df_add], ignore_index=True)
-                st.session_state.dados = st.session_state.dados.sort_values('data', ascending=False)
-            else:
-                st.session_state.dados = df_add
+            # Salvar no banco de dados SQLite (persistência)
+            inseridos, duplicados = save_data_to_database(df_add)
             
-            st.success(f"✅ {len(df_add)} registros adicionados à base! Total: {len(st.session_state.dados)} registros.")
-            st.balloons()
+            # Recarregar dados do banco para session_state
+            st.session_state.dados = load_data_from_database()
+            
+            if inseridos > 0:
+                st.success(f"✅ {inseridos} registros salvos no banco de dados! Total: {len(st.session_state.dados)} registros.")
+                st.balloons()
+            if duplicados > 0:
+                st.warning(f"⚠️ {duplicados} registros já existiam e foram ignorados.")
+            
+            # Dados persistidos - sobrevivem a reloads
         
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -245,7 +252,17 @@ st.divider()
 # Mostrar dados existentes
 if 'dados' in st.session_state and st.session_state.dados is not None:
     st.subheader("📊 Base de Dados Atual")
-    st.metric("Total de Registros", len(st.session_state.dados))
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total de Registros", len(st.session_state.dados))
+    with col2:
+        loterias_count = st.session_state.dados['loteria'].nunique()
+        st.metric("Loterias", loterias_count)
+    with col3:
+        if 'data' in st.session_state.dados.columns:
+            datas = st.session_state.dados['data'].dt.date.nunique()
+            st.metric("Dias", datas)
     
     with st.expander("Ver últimos 20 registros"):
         display_df = st.session_state.dados.head(20).copy()
@@ -253,4 +270,4 @@ if 'dados' in st.session_state and st.session_state.dados is not None:
             display_df['data'] = pd.to_datetime(display_df['data']).dt.strftime('%d/%m/%Y')
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-st.caption("⚠️ Use este processador para adicionar resultados rapidamente à base de dados.")
+st.caption("⚠️ Use este processador para adicionar resultados rapidamente à base de dados. Cada loteria é processada separadamente.")

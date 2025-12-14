@@ -1,5 +1,6 @@
 """
-Tabela dos 25 Bichos - Visualização interativa com pincel colorido
+Tabela dos 25 Bichos - Visualização com cores automáticas por dia
+Sistema adaptado para o novo escopo com ciclo de 5 dias
 """
 import streamlit as st
 import pandas as pd
@@ -15,13 +16,7 @@ st.markdown("""
         padding: 15px;
         text-align: center;
         margin: 5px;
-        transition: all 0.3s;
-        cursor: pointer;
-    }
-    
-    .bicho-card:hover {
-        transform: scale(1.05);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        min-height: 140px;
     }
     
     .bicho-numero {
@@ -40,34 +35,53 @@ st.markdown("""
         font-size: 2rem;
     }
     
-    .color-picker {
+    .day-dots {
         display: flex;
-        gap: 10px;
-        margin: 10px 0;
+        gap: 5px;
+        justify-content: center;
+        margin-top: 8px;
     }
     
-    .color-btn {
-        width: 30px;
-        height: 30px;
+    .day-dot {
+        width: 20px;
+        height: 20px;
         border-radius: 50%;
-        cursor: pointer;
-        border: 2px solid #333;
+        display: inline-block;
     }
     
-    .linha-header {
-        background: linear-gradient(90deg, #00C853, #00E676);
-        color: white;
-        padding: 10px 20px;
+    .color-legend {
+        display: flex;
+        gap: 15px;
+        margin: 15px 0;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .color-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 12px;
         border-radius: 8px;
-        font-weight: bold;
-        margin: 10px 0;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+    }
+    
+    .legend-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("🐾 Tabela dos 25 Bichos")
 
-from modules.data_loader import GRUPOS_ANIMAIS
+from modules.data_loader import (
+    GRUPOS_ANIMAIS, DIA_CORES, 
+    filter_5_day_cycle, get_grupo_days, get_day_color
+)
 
 # Emojis para cada animal
 EMOJIS = {
@@ -107,42 +121,39 @@ DEZENAS = {
     25: ['97', '98', '99', '00']
 }
 
-# Sidebar com cores
-st.sidebar.header("🎨 Pincel de Cores")
-cores = {
-    'vermelho': '#FF0000',
-    'verde': '#00C853',
-    'azul': '#2196F3',
-    'laranja': '#FF9800',
-    'preto': '#333333',
-    'nenhuma': 'transparent'
-}
+if 'dados' not in st.session_state or st.session_state.dados is None:
+    st.warning("⚠️ Nenhuma base de dados carregada. Acesse a página **📤 Upload** primeiro.")
+    st.stop()
 
-cor_selecionada = st.sidebar.radio(
-    "Selecione a cor:",
-    list(cores.keys()),
-    format_func=lambda x: f"🔴 Vermelho" if x == 'vermelho' else f"🟢 Verde" if x == 'verde' else f"🔵 Azul" if x == 'azul' else f"🟠 Laranja" if x == 'laranja' else f"⚫ Preto" if x == 'preto' else "⬜ Limpar"
+df = st.session_state.dados
+
+# Sidebar - Filtro por Loteria (OBRIGATÓRIO)
+st.sidebar.header("🔍 Filtro por Loteria")
+loterias = df['loteria'].unique().tolist()
+loteria_selecionada = st.sidebar.selectbox(
+    "Selecione a Loteria:",
+    options=loterias,
+    help="Cada loteria é analisada separadamente."
 )
 
-# Inicializar estado de cores dos bichos
-if 'bicho_colors' not in st.session_state:
-    st.session_state.bicho_colors = {i: 'transparent' for i in range(1, 26)}
+# Legenda de cores - CRÍTICO: cores indicam APENAS o dia
+st.markdown("""
+### 📖 Legenda de Cores por Dia
+<div class="color-legend">
+    <div class="color-item"><span class="legend-dot" style="background:#FF0000;"></span> DIA 1 (Mais Recente)</div>
+    <div class="color-item"><span class="legend-dot" style="background:#00C853;"></span> DIA 2</div>
+    <div class="color-item"><span class="legend-dot" style="background:#2196F3;"></span> DIA 3</div>
+    <div class="color-item"><span class="legend-dot" style="background:#FF9800;"></span> DIA 4</div>
+    <div class="color-item"><span class="legend-dot" style="background:#333333;"></span> DIA 5 (Mais Antigo)</div>
+</div>
+""", unsafe_allow_html=True)
 
-# Botões de controle
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🗑️ LIMPAR TODAS AS CORES", use_container_width=True):
-        st.session_state.bicho_colors = {i: 'transparent' for i in range(1, 26)}
-        st.rerun()
-
-with col2:
-    if st.button("🔄 ATUALIZAR", use_container_width=True):
-        st.rerun()
+st.info("💡 **Importante:** As cores indicam EXCLUSIVAMENTE em quais dias o bicho apareceu nos últimos 5 dias. Não representam frequência ou probabilidade.")
 
 st.divider()
 
 # Exibir tabela de bichos
-st.subheader("📋 Clique nos bichos para marcar")
+st.subheader(f"📋 Bichos - {loteria_selecionada}")
 
 # Grid 5x5
 for linha in range(5):
@@ -152,54 +163,65 @@ for linha in range(5):
         animal = GRUPOS_ANIMAIS.get(grupo, '')
         emoji = EMOJIS.get(grupo, '🐾')
         dezenas = ', '.join(DEZENAS.get(grupo, []))
-        cor_atual = st.session_state.bicho_colors.get(grupo, 'transparent')
+        
+        # Obter dias em que o grupo apareceu (cores automáticas)
+        dias_apareceu = get_grupo_days(df, loteria_selecionada, grupo)
         
         with cols[col_idx]:
-            # Determinar cor do fundo
-            bg_color = cor_atual if cor_atual != 'transparent' else '#f8f9fa'
-            text_color = 'white' if cor_atual not in ['transparent', '#FF9800'] else '#333'
+            # Gerar HTML dos círculos de cores
+            dots_html = ""
+            if dias_apareceu:
+                for dia_num in dias_apareceu:
+                    cor_info = get_day_color(dia_num)
+                    dots_html += f'<span class="day-dot" style="background:{cor_info["cor"]};" title="Dia {dia_num}"></span>'
+            else:
+                dots_html = '<span style="color:#999; font-size:0.8rem;">—</span>'
             
             # Card do bicho
             st.markdown(f"""
-            <div style="background: {bg_color}; border: 2px solid #ddd; border-radius: 10px;
-                        padding: 15px; text-align: center; margin: 5px; min-height: 120px;">
-                <div style="font-size: 2rem;">{emoji}</div>
-                <div style="font-size: 1.3rem; font-weight: bold; color: {text_color};">{grupo:02d}</div>
-                <div style="font-size: 0.9rem; color: {text_color if text_color == 'white' else '#666'};">{animal}</div>
-                <div style="font-size: 0.7rem; color: {text_color if text_color == 'white' else '#888'};">{dezenas}</div>
+            <div class="bicho-card">
+                <div class="bicho-emoji">{emoji}</div>
+                <div class="bicho-numero">{grupo:02d}</div>
+                <div class="bicho-nome">{animal}</div>
+                <div style="font-size: 0.7rem; color: #888; margin-top: 3px;">{dezenas}</div>
+                <div class="day-dots">{dots_html}</div>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Botão para marcar
-            if st.button(f"Marcar {grupo}", key=f"btn_{grupo}", use_container_width=True):
-                st.session_state.bicho_colors[grupo] = cores[cor_selecionada]
-                st.rerun()
 
 st.divider()
 
-# Estatísticas se houver dados
-if 'dados' in st.session_state and st.session_state.dados is not None:
-    st.subheader("📊 Frequência por Grupo (Últimos 30 dias)")
-    
-    from modules.data_loader import filter_last_n_days
-    from modules import statistics as stats
-    
-    df_30d = filter_last_n_days(st.session_state.dados, 30)
-    grupos_freq = stats.get_grupo_frequency(df_30d, top_n=25)
-    
-    if len(grupos_freq) > 0:
-        # Criar grid de contagem
-        for linha in range(5):
-            cols = st.columns(5)
-            for col_idx in range(5):
-                grupo = linha * 5 + col_idx + 1
-                animal = GRUPOS_ANIMAIS.get(grupo, '')
-                
-                # Buscar frequência
-                freq_row = grupos_freq[grupos_freq['grupo'] == grupo]
-                freq = freq_row['frequencia'].values[0] if len(freq_row) > 0 else 0
-                
-                with cols[col_idx]:
-                    st.metric(f"{grupo:02d} {animal}", freq)
+# Resumo estatístico
+st.subheader("📊 Resumo dos Últimos 5 Dias")
 
-st.caption("⚠️ Clique nos bichos para marcá-los com a cor selecionada no pincel.")
+df_5dias = filter_5_day_cycle(df, loteria_selecionada)
+
+if len(df_5dias) > 0:
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total de Resultados", len(df_5dias))
+    
+    with col2:
+        grupos_unicos = df_5dias['grupo'].nunique()
+        st.metric("Grupos que Saíram", f"{grupos_unicos}/25")
+    
+    with col3:
+        # Grupo mais frequente
+        grupo_top = df_5dias['grupo'].value_counts().index[0]
+        freq_top = df_5dias['grupo'].value_counts().values[0]
+        st.metric("Grupo Top", f"{grupo_top:02d} - {GRUPOS_ANIMAIS.get(grupo_top, '')} ({freq_top}x)")
+    
+    # Tabela de frequência ordenada por frequência (não cronológica)
+    st.markdown("### 📈 Frequência por Grupo (Ordenado por Frequência)")
+    
+    freq_df = df_5dias['grupo'].value_counts().reset_index()
+    freq_df.columns = ['Grupo', 'Frequência']
+    freq_df['Animal'] = freq_df['Grupo'].map(GRUPOS_ANIMAIS)
+    freq_df['Grupo'] = freq_df['Grupo'].apply(lambda x: f"{x:02d}")
+    freq_df = freq_df[['Grupo', 'Animal', 'Frequência']]
+    
+    st.dataframe(freq_df, use_container_width=True, hide_index=True)
+else:
+    st.info("Nenhum dado encontrado para esta loteria nos últimos 5 dias.")
+
+st.caption("⚠️ As cores nos cards indicam em quais dias o bicho apareceu. Isso é uma marcação visual por dia, não indica frequência ou probabilidade.")

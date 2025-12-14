@@ -1,5 +1,6 @@
 """
-Análise por Dias - DIA 1 a DIA 5
+Análise por Dias - DIA 1 a DIA 5 com cores fixas
+Sistema adaptado para o novo escopo com ciclo de 5 dias
 """
 import streamlit as st
 import pandas as pd
@@ -7,10 +8,21 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Análise por Dias", page_icon="📅", layout="wide")
 
-# CSS customizado para o layout verde
+# CSS customizado com cores por dia
 st.markdown("""
 <style>
-    .day-header {
+    .day-header-1 {
+        background: linear-gradient(90deg, #FF0000, #FF4444);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 15px;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .day-header-2 {
         background: linear-gradient(90deg, #00C853, #00E676);
         color: white;
         padding: 15px;
@@ -21,28 +33,37 @@ st.markdown("""
         font-size: 1.2rem;
     }
     
-    .animal-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 2px;
-        background: #00C853;
-        padding: 2px;
-        border-radius: 8px;
-    }
-    
-    .animal-cell {
-        background: #f0f0f0;
-        padding: 10px;
-        text-align: center;
-        font-size: 0.9rem;
-    }
-    
-    .animal-cell-header {
-        background: #00C853;
+    .day-header-3 {
+        background: linear-gradient(90deg, #2196F3, #42A5F5);
         color: white;
-        padding: 10px;
+        padding: 15px;
+        border-radius: 10px;
         text-align: center;
+        margin-bottom: 15px;
         font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .day-header-4 {
+        background: linear-gradient(90deg, #FF9800, #FFB74D);
+        color: #000;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 15px;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .day-header-5 {
+        background: linear-gradient(90deg, #333333, #555555);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 15px;
+        font-weight: bold;
+        font-size: 1.2rem;
     }
     
     .freq-table {
@@ -68,11 +89,20 @@ st.markdown("""
         padding: 2px 10px;
     }
     
-    .freq-summary {
-        color: #FFD700;
-        font-weight: bold;
-        margin-top: 10px;
+    .color-legend {
+        display: flex;
+        gap: 15px;
+        margin: 10px 0;
+        flex-wrap: wrap;
+    }
+    
+    .color-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
         padding: 5px 10px;
+        border-radius: 5px;
+        background: #f0f0f0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -83,24 +113,51 @@ if 'dados' not in st.session_state or st.session_state.dados is None:
     st.warning("⚠️ Nenhuma base de dados carregada. Acesse a página **📤 Upload** primeiro.")
     st.stop()
 
-from modules.data_loader import GRUPOS_ANIMAIS
+from modules.data_loader import (
+    GRUPOS_ANIMAIS, DIA_CORES, 
+    get_last_5_unique_dates, get_day_number, filter_5_day_cycle, get_day_color
+)
 
 df = st.session_state.dados
 
-# Sidebar - Filtros
-st.sidebar.header("🔍 Filtros")
+# Sidebar - Filtro por Loteria (OBRIGATÓRIO)
+st.sidebar.header("🔍 Filtro por Loteria")
 loterias = df['loteria'].unique().tolist()
-loteria_selecionada = st.sidebar.selectbox("Loteria", options=loterias)
+loteria_selecionada = st.sidebar.selectbox(
+    "Selecione a Loteria:", 
+    options=loterias,
+    help="Cada loteria é analisada separadamente. Nunca misturar dados."
+)
 
-# Filtrar por loteria
-df_lot = df[df['loteria'] == loteria_selecionada].copy()
-df_lot = df_lot.sort_values('data', ascending=False)
+# Legenda de cores
+st.markdown("""
+<div class="color-legend">
+    <div class="color-item"><span style="color:#FF0000;">●</span> DIA 1 - Vermelho (Mais Recente)</div>
+    <div class="color-item"><span style="color:#00C853;">●</span> DIA 2 - Verde</div>
+    <div class="color-item"><span style="color:#2196F3;">●</span> DIA 3 - Azul</div>
+    <div class="color-item"><span style="color:#FF9800;">●</span> DIA 4 - Laranja</div>
+    <div class="color-item"><span style="color:#333333;">●</span> DIA 5 - Preto (Mais Antigo)</div>
+</div>
+""", unsafe_allow_html=True)
 
-# Pegar as últimas 5 datas únicas
-datas_unicas = df_lot['data'].dt.date.unique()[:5]
+st.divider()
 
-# Nomes dos dias
-dias_nomes = ["DIA 1 (HOJE)", "DIA 2 (ONTEM)", "DIA 3 (TERCEIRO DIA)", "DIA 4 (QUARTO DIA)", "DIA 5 (QUINTO DIA)"]
+# Filtrar por loteria e obter últimos 5 dias
+df_5dias = filter_5_day_cycle(df, loteria_selecionada)
+datas_5dias = get_last_5_unique_dates(df, loteria_selecionada)
+
+if len(datas_5dias) == 0:
+    st.warning(f"⚠️ Nenhum dado encontrado para a loteria **{loteria_selecionada}**.")
+    st.stop()
+
+# Nomes dos dias com cores
+dias_config = [
+    {"nome": "DIA 1 (MAIS RECENTE)", "classe": "day-header-1", "cor": DIA_CORES[1]},
+    {"nome": "DIA 2", "classe": "day-header-2", "cor": DIA_CORES[2]},
+    {"nome": "DIA 3", "classe": "day-header-3", "cor": DIA_CORES[3]},
+    {"nome": "DIA 4", "classe": "day-header-4", "cor": DIA_CORES[4]},
+    {"nome": "DIA 5 (MAIS ANTIGO)", "classe": "day-header-5", "cor": DIA_CORES[5]},
+]
 
 def get_animal_counts(df_dia):
     """Conta quantas vezes cada animal saiu no dia"""
@@ -120,14 +177,23 @@ def get_digit_frequency(df_dia, tipo='milhar'):
     return freq
 
 # Análise por dia
-for idx, data in enumerate(datas_unicas):
+for idx, data in enumerate(datas_5dias):
     if idx >= 5:
         break
     
-    df_dia = df_lot[df_lot['data'].dt.date == data]
-    dia_nome = dias_nomes[idx] if idx < len(dias_nomes) else f"DIA {idx+1}"
+    df_dia = df_5dias[df_5dias['data'].dt.date == data]
+    config = dias_config[idx]
+    dia_num = idx + 1
+    cor_info = DIA_CORES[dia_num]
     
-    st.markdown(f'<div class="day-header">📊 ANÁLISE DOS BICHOS - {dia_nome}</div>', unsafe_allow_html=True)
+    data_formatada = data.strftime('%d/%m/%Y')
+    
+    # Header com cor do dia
+    st.markdown(f'''
+    <div class="{config['classe']}">
+        {cor_info['emoji']} ANÁLISE - {config['nome']} ({data_formatada})
+    </div>
+    ''', unsafe_allow_html=True)
     
     # Grid de animais (5 colunas x 5 linhas)
     animal_counts = get_animal_counts(df_dia)
@@ -140,9 +206,14 @@ for idx, data in enumerate(datas_unicas):
         count = animal_counts.get(grupo, 0)
         
         with cols[i % 5]:
-            # Cor de fundo baseada na contagem
-            bg_color = "#e8f5e9" if count > 0 else "#f5f5f5"
-            text_color = "#00C853" if count > 0 else "#666"
+            # Cor de fundo baseada na contagem e na cor do dia
+            if count > 0:
+                bg_color = cor_info['cor']
+                text_color = cor_info['text_color']
+            else:
+                bg_color = "#f5f5f5"
+                text_color = "#666"
+            
             st.markdown(f"""
             <div style="background: {bg_color}; padding: 8px; margin: 2px; 
                         border-radius: 5px; text-align: center; border: 1px solid #ddd;">
@@ -158,7 +229,7 @@ for idx, data in enumerate(datas_unicas):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown(f"### 📋 Tabela de Dezenas - {dia_nome.split(' ')[0]} {dia_nome.split(' ')[1] if len(dia_nome.split(' ')) > 1 else ''}")
+        st.markdown(f"### 📋 Tabela de Dezenas - DIA {dia_num}")
         
         # Criar tabela de dezenas
         dezenas_data = []
@@ -177,9 +248,9 @@ for idx, data in enumerate(datas_unicas):
             animal = GRUPOS_ANIMAIS.get(grupo, '')
             dezenas = ', '.join(dezenas_found.get(grupo, []))
             dezenas_data.append({
-                'Grupos': grupo,
-                'Nomes': animal,
-                'Dezenas': dezenas
+                'Grupo': f"{grupo:02d}",
+                'Nome': animal,
+                'Dezenas': dezenas if dezenas else '—'
             })
         
         df_dezenas = pd.DataFrame(dezenas_data)
@@ -189,9 +260,9 @@ for idx, data in enumerate(datas_unicas):
         # Frequência de Pedras - Milhar
         st.markdown(f"""
         <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
-            <div style="background: #00C853; color: white; padding: 10px; text-align: center; 
+            <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
                         font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
-                FREQUÊNCIA DE PEDRAS - MILHAR ({dia_nome.split(' ')[0]} {dia_nome.split(' ')[1] if len(dia_nome.split(' ')) > 1 else ''})
+                FREQUÊNCIA DE PEDRAS - MILHAR (DIA {dia_num})
             </div>
         """, unsafe_allow_html=True)
         
@@ -220,9 +291,9 @@ for idx, data in enumerate(datas_unicas):
         # Frequência de Pedras - Centena
         st.markdown(f"""
         <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px;">
-            <div style="background: #00C853; color: white; padding: 10px; text-align: center; 
+            <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
                         font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
-                FREQUÊNCIA DE PEDRAS - CENTENA ({dia_nome.split(' ')[0]} {dia_nome.split(' ')[1] if len(dia_nome.split(' ')) > 1 else ''})
+                FREQUÊNCIA DE PEDRAS - CENTENA (DIA {dia_num})
             </div>
         """, unsafe_allow_html=True)
         
@@ -248,4 +319,4 @@ for idx, data in enumerate(datas_unicas):
     
     st.markdown("---")
 
-st.caption("⚠️ Análise estatística para fins informativos. Resultados passados não garantem resultados futuros.")
+st.caption("⚠️ Análise estatística para fins informativos. Cores indicam APENAS o dia, não representam frequência ou probabilidade.")
