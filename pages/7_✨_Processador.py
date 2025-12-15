@@ -160,16 +160,24 @@ if processar and resultados_texto:
             # Limpar a linha
             linha_limpa = linha.strip()
             
+            # Ignorar linhas que são apenas nomes de animais ou texto simples
+            # (linhas que não contêm números são ignoradas silenciosamente)
+            if not re.search(r'\d', linha_limpa):
+                continue
+            
             # Remover número de ordem se existir (ex: "1:", "2:")
             linha_limpa = re.sub(r'^\d+[:\.\)]\s*', '', linha_limpa)
             
-            # Extrair milhar (número de 4 dígitos, pode ter ponto)
-            milhar_match = re.search(r'(\d[\d\.]*\d)', linha_limpa)
+            # Extrair milhar (número de 3-4 dígitos, pode ter ponto)
+            milhar_match = re.search(r'(\d[\d\.]*\d{2,})', linha_limpa)
             if milhar_match:
                 milhar_str = milhar_match.group(1).replace('.', '')
                 milhar = int(milhar_str)
+                # Garantir que é um número de 3-4 dígitos
+                if milhar < 100 or milhar > 9999:
+                    continue  # Ignorar silenciosamente
             else:
-                raise ValueError("Milhar não encontrado")
+                continue  # Ignorar linhas sem milhar válida
             
             # Extrair centena (últimos 3 dígitos da milhar)
             centena = milhar % 1000
