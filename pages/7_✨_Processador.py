@@ -92,7 +92,7 @@ with col1:
     # Horários específicos por loteria (conforme documentação)
     HORARIOS_POR_LOTERIA = {
         "Nacional": ["02:00", "08:00", "10:00", "12:00", "15:00", "17:00", "21:00", "23:00"],
-        "Look GO": ["07:00", "09:00", "11:00", "14:00", "16:00", "21:00", "23:00"],
+        "Look GO": ["07:00", "09:00", "11:00", "14:00", "16:00", "18:00", "21:00", "23:00"],
         "Capital": ["10:00", "11:00", "13:00", "14:00", "16:00", "18:00", "20:00", "22:00"],
         "RJ": ["09:00", "11:00", "14:00", "16:00", "18:00", "21:00"],  # Horários RJ
         "Federal": ["19:00"],  # Federal tem horário único
@@ -327,5 +327,69 @@ if 'dados' in st.session_state and st.session_state.dados is not None:
         if 'data' in display_df.columns:
             display_df['data'] = pd.to_datetime(display_df['data']).dt.strftime('%d/%m/%Y')
         st.dataframe(display_df, use_container_width=True, hide_index=True)
+    
+    # Seção de gerenciamento de registros
+    st.divider()
+    st.subheader("🗑️ Gerenciar Registros")
+    
+    with st.expander("⚠️ Excluir Registros por Filtro"):
+        st.warning("**Atenção:** Esta ação é irreversível! Os registros serão permanentemente excluídos.")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            del_loteria = st.selectbox("Loteria:", loterias, key="del_loteria")
+        with col2:
+            del_data = st.date_input("Data:", key="del_data")
+        with col3:
+            del_horarios = HORARIOS_POR_LOTERIA.get(del_loteria, ["11:00", "14:00", "18:00", "21:00"])
+            del_horario = st.selectbox("Horário:", del_horarios, key="del_horario")
+        
+        # Mostrar quantos registros serão afetados
+        del_data_str = del_data.strftime('%Y-%m-%d')
+        registros_filtro = st.session_state.dados[
+            (st.session_state.dados['loteria'] == del_loteria) &
+            (st.session_state.dados['data'].dt.strftime('%Y-%m-%d') == del_data_str) &
+            (st.session_state.dados['horario'] == del_horario)
+        ]
+        
+        if len(registros_filtro) > 0:
+            st.info(f"📊 **{len(registros_filtro)} registro(s)** encontrado(s) com este filtro:")
+            preview_df = registros_filtro.copy()
+            preview_df['data'] = pd.to_datetime(preview_df['data']).dt.strftime('%d/%m/%Y')
+            preview_df['milhar'] = preview_df['milhar'].apply(lambda x: f"{x:04d}")
+            preview_df['grupo'] = preview_df['grupo'].apply(lambda x: f"{x:02d}")
+            st.dataframe(preview_df[['data', 'loteria', 'horario', 'grupo', 'animal', 'milhar']], 
+                        use_container_width=True, hide_index=True)
+            
+            if st.button("🗑️ EXCLUIR ESTES REGISTROS", type="secondary", key="btn_excluir"):
+                from modules.database import delete_records_by_filter
+                deleted = delete_records_by_filter(del_loteria, del_data_str, del_horario)
+                if deleted > 0:
+                    st.success(f"✅ {deleted} registro(s) excluído(s) com sucesso!")
+                    st.session_state.dados = load_data_from_database()
+                    st.rerun()
+                else:
+                    st.error("❌ Erro ao excluir registros. Verifique se a política DELETE está habilitada no Supabase.")
+        else:
+            st.info("ℹ️ Nenhum registro encontrado com este filtro.")
+    
+    with st.expander("🔥 Zerar Toda a Base de Dados"):
+        st.error("**⚠️ PERIGO:** Esta ação irá deletar TODOS os registros do banco de dados! Esta ação é IRREVERSÍVEL!")
+        
+        confirmacao = st.text_input("Digite 'CONFIRMAR' para habilitar o botão de exclusão:", key="confirm_delete_all")
+        
+        if confirmacao == "CONFIRMAR":
+            if st.button("🔥 ZERAR TODA A BASE", type="primary", key="btn_zerar"):
+                from modules.database import delete_all_records
+                deleted = delete_all_records()
+                if deleted > 0:
+                    st.success(f"✅ {deleted} registro(s) excluído(s)! Base zerada.")
+                    st.session_state.dados = load_data_from_database()
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Nenhum registro foi excluído. Pode ser que a base já estivesse vazia ou a política DELETE não está habilitada no Supabase.")
+        else:
+            st.button("🔥 ZERAR TODA A BASE", type="primary", disabled=True, key="btn_zerar_disabled")
 
 st.caption("⚠️ Use este processador para adicionar resultados rapidamente à base de dados. Cada loteria é processada separadamente.")

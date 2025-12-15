@@ -36,3 +36,7 @@ CREATE POLICY "Allow public insert" ON resultados
 -- Política para permitir atualização pública
 CREATE POLICY "Allow public update" ON resultados
     FOR UPDATE USING (true);
+
+-- Política para permitir exclusão pública
+CREATE POLICY "Allow public delete" ON resultados
+    FOR DELETE USING (true);

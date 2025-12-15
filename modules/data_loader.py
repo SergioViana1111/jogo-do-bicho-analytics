@@ -67,10 +67,10 @@ def get_last_5_unique_dates(df: pd.DataFrame, loteria: str) -> list:
     df_lot['data'] = pd.to_datetime(df_lot['data'])
     
     # Pegar datas únicas ordenadas (mais recente primeiro)
-    datas_unicas = df_lot['data'].dt.date.unique()
-    datas_ordenadas = sorted(datas_unicas, reverse=True)
+    # Usar tolist() e sorted() para garantir ordenação correta
+    datas_unicas = sorted(set(df_lot['data'].dt.date.tolist()), reverse=True)
     
-    return list(datas_ordenadas[:5])
+    return datas_unicas[:5]
 
 def get_day_number(df: pd.DataFrame, loteria: str, data) -> int:
     """

@@ -285,9 +285,70 @@ def get_record_count() -> int:
         except:
             return 0
 
-def delete_old_data(days_to_keep: int = 30):
-    """Remove dados mais antigos que X dias"""
-    return 0
+def delete_records_by_filter(loteria: str, data: str, horario: str) -> int:
+    """
+    Deleta registros por filtro (loteria, data, horário).
+    Retorna número de registros deletados.
+    """
+    if _is_supabase_available():
+        try:
+            client = st.session_state._supabase_client
+            result = client.table('resultados').delete().eq('loteria', loteria).eq('data', data).eq('horario', horario).execute()
+            deleted_count = len(result.data) if result.data else 0
+            print(f"[DB] Supabase: {deleted_count} registros deletados")
+            return deleted_count
+        except Exception as e:
+            print(f"[DB] Erro ao deletar Supabase: {e}")
+            return 0
+    else:
+        try:
+            import sqlite3
+            conn = _get_sqlite_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM resultados 
+                WHERE loteria = ? AND data = ? AND horario = ?
+            ''', (loteria, data, horario))
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            print(f"[DB] SQLite: {deleted_count} registros deletados")
+            return deleted_count
+        except Exception as e:
+            print(f"[DB] Erro ao deletar SQLite: {e}")
+            return 0
+
+def delete_all_records() -> int:
+    """
+    Deleta TODOS os registros do banco de dados.
+    ⚠️ Use com cuidado!
+    Retorna número de registros deletados.
+    """
+    if _is_supabase_available():
+        try:
+            client = st.session_state._supabase_client
+            # Deletar onde id != 0 (pega todos)
+            result = client.table('resultados').delete().neq('id', 0).execute()
+            deleted_count = len(result.data) if result.data else 0
+            print(f"[DB] Supabase: {deleted_count} registros deletados")
+            return deleted_count
+        except Exception as e:
+            print(f"[DB] Erro ao deletar Supabase: {e}")
+            return 0
+    else:
+        try:
+            import sqlite3
+            conn = _get_sqlite_connection()
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM resultados')
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            print(f"[DB] SQLite: {deleted_count} registros deletados")
+            return deleted_count
+        except Exception as e:
+            print(f"[DB] Erro ao deletar SQLite: {e}")
+            return 0
 
 # Inicializar ao importar
 try:
