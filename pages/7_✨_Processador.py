@@ -315,18 +315,22 @@ if limpar:
 
 st.divider()
 
-# Mostrar dados existentes - FILTRADO pela loteria selecionada
+# Mostrar dados existentes - FILTRADO pela loteria e data selecionadas
 if 'dados' in st.session_state and st.session_state.dados is not None:
     st.subheader(f"📊 Base de Dados - {loteria_selecionada}")
     
     # Filtrar dados pela loteria selecionada
     df_loteria = st.session_state.dados[st.session_state.dados['loteria'] == loteria_selecionada].copy()
     
+    # Filtrar também pela data selecionada
+    data_filtro_str = data_resultado.strftime('%Y-%m-%d')
+    df_loteria_data = df_loteria[df_loteria['data'].dt.strftime('%Y-%m-%d') == data_filtro_str].copy()
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(f"Registros {loteria_selecionada}", len(df_loteria))
+        st.metric(f"Registros {data_resultado.strftime('%d/%m')}", len(df_loteria_data))
     with col2:
-        st.metric("Total Geral", len(st.session_state.dados))
+        st.metric(f"Total {loteria_selecionada}", len(df_loteria))
     with col3:
         if 'data' in df_loteria.columns and len(df_loteria) > 0:
             datas = df_loteria['data'].dt.date.nunique()
@@ -334,18 +338,18 @@ if 'dados' in st.session_state and st.session_state.dados is not None:
         else:
             st.metric("Dias", 0)
     with col4:
-        if len(df_loteria) > 0:
-            horarios = df_loteria['horario'].nunique()
+        if len(df_loteria_data) > 0:
+            horarios = df_loteria_data['horario'].nunique()
             st.metric("Horários", horarios)
         else:
             st.metric("Horários", 0)
     
-    # Tabela filtrada pela loteria
-    with st.expander(f"📋 Ver registros de {loteria_selecionada} (últimos 30)", expanded=True):
-        if len(df_loteria) > 0:
-            # Ordenar por data (mais recente primeiro), depois por horário
-            df_loteria = df_loteria.sort_values(['data', 'horario'], ascending=[False, False])
-            display_df = df_loteria.head(30).copy()
+    # Tabela filtrada pela loteria E data
+    with st.expander(f"📋 Registros de {loteria_selecionada} em {data_resultado.strftime('%d/%m/%Y')}", expanded=True):
+        if len(df_loteria_data) > 0:
+            # Ordenar por horário
+            df_loteria_data = df_loteria_data.sort_values('horario', ascending=True)
+            display_df = df_loteria_data.copy()
             
             # Formatar para exibição
             display_df['data'] = pd.to_datetime(display_df['data']).dt.strftime('%d/%m/%Y')
@@ -362,9 +366,25 @@ if 'dados' in st.session_state and st.session_state.dados is not None:
             
             # Resumo por horário
             st.markdown("**📊 Resumo por Horário:**")
-            resumo = df_loteria.groupby('horario').size().reset_index(name='Registros')
+            resumo = df_loteria_data.groupby('horario').size().reset_index(name='Registros')
             resumo = resumo.sort_values('horario')
             st.dataframe(resumo, use_container_width=True, hide_index=True, height=150)
+        else:
+            st.info(f"ℹ️ Nenhum registro de {loteria_selecionada} encontrado para {data_resultado.strftime('%d/%m/%Y')}.")
+    
+    # Mostrar também registros recentes de todas as datas (colapsado)
+    with st.expander(f"📋 Ver todos os registros de {loteria_selecionada} (últimos 30)"):
+        if len(df_loteria) > 0:
+            df_loteria = df_loteria.sort_values(['data', 'horario'], ascending=[False, False])
+            display_df = df_loteria.head(30).copy()
+            display_df['data'] = pd.to_datetime(display_df['data']).dt.strftime('%d/%m/%Y')
+            display_df['milhar'] = display_df['milhar'].apply(lambda x: f"{x:04d}")
+            display_df['grupo'] = display_df['grupo'].apply(lambda x: f"{x:02d}")
+            display_df['centena'] = display_df['centena'].apply(lambda x: f"{x:03d}")
+            cols_show = ['data', 'horario', 'grupo', 'animal', 'milhar', 'centena']
+            if 'id' in display_df.columns:
+                cols_show = ['id'] + cols_show
+            st.dataframe(display_df[cols_show], use_container_width=True, hide_index=True)
         else:
             st.info(f"ℹ️ Nenhum registro encontrado para {loteria_selecionada}.")
     
