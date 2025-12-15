@@ -307,26 +307,58 @@ if limpar:
 
 st.divider()
 
-# Mostrar dados existentes
+# Mostrar dados existentes - FILTRADO pela loteria selecionada
 if 'dados' in st.session_state and st.session_state.dados is not None:
-    st.subheader("📊 Base de Dados Atual")
+    st.subheader(f"📊 Base de Dados - {loteria_selecionada}")
     
-    col1, col2, col3 = st.columns(3)
+    # Filtrar dados pela loteria selecionada
+    df_loteria = st.session_state.dados[st.session_state.dados['loteria'] == loteria_selecionada].copy()
+    
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total de Registros", len(st.session_state.dados))
+        st.metric(f"Registros {loteria_selecionada}", len(df_loteria))
     with col2:
-        loterias_count = st.session_state.dados['loteria'].nunique()
-        st.metric("Loterias", loterias_count)
+        st.metric("Total Geral", len(st.session_state.dados))
     with col3:
-        if 'data' in st.session_state.dados.columns:
-            datas = st.session_state.dados['data'].dt.date.nunique()
+        if 'data' in df_loteria.columns and len(df_loteria) > 0:
+            datas = df_loteria['data'].dt.date.nunique()
             st.metric("Dias", datas)
+        else:
+            st.metric("Dias", 0)
+    with col4:
+        if len(df_loteria) > 0:
+            horarios = df_loteria['horario'].nunique()
+            st.metric("Horários", horarios)
+        else:
+            st.metric("Horários", 0)
     
-    with st.expander("Ver últimos 20 registros"):
-        display_df = st.session_state.dados.head(20).copy()
-        if 'data' in display_df.columns:
+    # Tabela filtrada pela loteria
+    with st.expander(f"📋 Ver registros de {loteria_selecionada} (últimos 30)", expanded=True):
+        if len(df_loteria) > 0:
+            # Ordenar por data (mais recente primeiro), depois por horário
+            df_loteria = df_loteria.sort_values(['data', 'horario'], ascending=[False, False])
+            display_df = df_loteria.head(30).copy()
+            
+            # Formatar para exibição
             display_df['data'] = pd.to_datetime(display_df['data']).dt.strftime('%d/%m/%Y')
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+            display_df['milhar'] = display_df['milhar'].apply(lambda x: f"{x:04d}")
+            display_df['grupo'] = display_df['grupo'].apply(lambda x: f"{x:02d}")
+            display_df['centena'] = display_df['centena'].apply(lambda x: f"{x:03d}")
+            
+            # Selecionar colunas relevantes
+            cols_show = ['data', 'horario', 'grupo', 'animal', 'milhar', 'centena']
+            if 'id' in display_df.columns:
+                cols_show = ['id'] + cols_show
+            
+            st.dataframe(display_df[cols_show], use_container_width=True, hide_index=True)
+            
+            # Resumo por horário
+            st.markdown("**📊 Resumo por Horário:**")
+            resumo = df_loteria.groupby('horario').size().reset_index(name='Registros')
+            resumo = resumo.sort_values('horario')
+            st.dataframe(resumo, use_container_width=True, hide_index=True, height=150)
+        else:
+            st.info(f"ℹ️ Nenhum registro encontrado para {loteria_selecionada}.")
     
     # Seção de gerenciamento de registros
     st.divider()
