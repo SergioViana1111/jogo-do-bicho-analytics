@@ -11,6 +11,107 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ============================================
+# SISTEMA DE LOGIN
+# ============================================
+
+# Credenciais hardcoded
+VALID_EMAIL = "marcelombarbosa.rj@gmail.com"
+VALID_PASSWORD = "Farofa@123"
+
+def check_credentials(email: str, password: str) -> bool:
+    """Verifica se as credenciais são válidas."""
+    return email == VALID_EMAIL and password == VALID_PASSWORD
+
+def show_login_page():
+    """Exibe a página de login."""
+    # CSS para a tela de login
+    st.markdown("""
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: linear-gradient(145deg, #1e2130, #252836);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 200, 83, 0.2);
+            border: 1px solid rgba(0, 200, 83, 0.3);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .login-header h1 {
+            color: #00C853;
+            font-size: 2rem;
+            margin: 0;
+            text-shadow: 0 0 20px rgba(0, 200, 83, 0.5);
+        }
+        .login-header p {
+            color: #888;
+            margin-top: 0.5rem;
+        }
+        .login-icon {
+            font-size: 4rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        /* Hide sidebar on login page */
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+        /* Hide streamlit branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Centralizar conteúdo
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("""
+        <div class="login-icon">🎲</div>
+        <div class="login-header">
+            <h1>Jogo do Bicho Analytics</h1>
+            <p>Faça login para acessar o painel</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Formulário de login
+        with st.form("login_form"):
+            email = st.text_input("📧 E-mail", placeholder="Digite seu e-mail")
+            password = st.text_input("🔒 Senha", type="password", placeholder="Digite sua senha")
+            
+            submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
+            
+            if submit:
+                if email and password:
+                    if check_credentials(email, password):
+                        st.session_state.authenticated = True
+                        st.session_state.user_email = email
+                        st.rerun()
+                    else:
+                        st.error("❌ Credenciais inválidas! Verifique seu e-mail e senha.")
+                else:
+                    st.warning("⚠️ Por favor, preencha todos os campos.")
+        
+        st.markdown("---")
+        st.caption("🔐 Sistema protegido. Acesso restrito a usuários autorizados.")
+
+# Verificar se o usuário está autenticado
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+
+# Se não estiver autenticado, mostrar página de login
+if not st.session_state.authenticated:
+    show_login_page()
+    st.stop()
+
+# ============================================
+# CONTEÚDO DO APP (só aparece após login)
+# ============================================
+
 # CSS customizado
 st.markdown("""
 <style>

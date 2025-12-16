@@ -9,6 +9,10 @@ from datetime import datetime, date
 
 st.set_page_config(page_title="Processador", page_icon="✨", layout="wide")
 
+# Verificação de autenticação
+from modules.auth import check_authentication
+check_authentication()
+
 # CSS customizado
 st.markdown("""
 <style>

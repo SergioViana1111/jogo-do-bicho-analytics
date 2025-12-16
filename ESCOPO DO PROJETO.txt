@@ -1,0 +1,139 @@
+1. Objetivo do Projeto
+
+Desenvolver um painel web interativo para análise estatística do Jogo do Bicho, com as seguintes funcionalidades:
+
+Organizar resultados
+
+Identificar padrões
+
+Analisar repetições
+
+Consolidar pedras e linhas mais frequentes
+Tudo isso será feito com base em dados inseridos manualmente, sem automação de busca externa de resultados.
+
+2. Funcionalidades Principais
+2.1 Tela de Processador de Resultados
+
+Entrada de dados manual (digitar ou colar resultados)
+
+Os resultados são organizados conforme o filtro de loteria:
+
+Exemplo: Nacional, Look Goiás, etc.
+
+Após a inserção dos dados, o sistema faz análises automáticas, calculando:
+
+Pedras de milhar e centena mais frequentes
+
+Linhas de grupos mais recorrentes
+
+Sinalização por cor (cada cor para o dia correspondente)
+
+2.2 Tela de Análise por Loteria
+
+Resultados filtrados e analisados somente pela loteria selecionada
+
+Exemplo: Se a loteria Nacional for selecionada, apenas os dados da Nacional serão analisados.
+
+2.3 Tela de Análise por Dias (Dia 1 ao Dia 5)
+
+Exibição das análises diárias:
+
+Dia 1 (hoje), Dia 2 (ontem), Dia 3, Dia 4, Dia 5
+
+A cor para cada dia será:
+
+Dia 1 = vermelho
+
+Dia 2 = verde
+
+Dia 3 = azul
+
+Dia 4 = laranja
+
+Dia 5 = preto
+
+A cor será aplicada automaticamente para sinalizar os grupos.
+
+2.4 Consolidação Estatística
+
+Consolidação das pedras de milhar e centena mais frequentes
+
+Consolidação das linhas de grupos que mais se repetem
+
+2.5 Janela de Análise
+
+A análise será feita somente pelos últimos 5 dias.
+
+Dados anteriores a isso não serão considerados nas análises.
+
+3. Comportamento e Funcionalidade
+3.1 Movimentação de Dias
+
+O sistema move automaticamente os dias:
+
+O Dia 1 vira Dia 2, Dia 2 vira Dia 3, e assim por diante.
+
+O Dia 5 é arquivado, não entra mais nas análises após o próximo sorteio.
+
+3.2 Sinalização de Cores
+
+A sinalização será feita por grupo x dia, ou seja:
+
+Cada grupo de resultado será colorido conforme o dia em que ele foi sorteado.
+
+3.3 Inserção de Dados
+
+A inserção dos resultados será feita manual (via tela de entrada).
+
+Não haverá automação diária (sistema não irá buscar resultados automaticamente).
+
+3.4 Fase de Testes
+
+Os testes serão focados na verificação da lógica de análise e no comportamento de entrada de dados.
+
+Ajustes serão feitos para corrigir qualquer erro de leitura ou visualização.
+
+4. Escopo Fechado
+
+Somente os últimos 5 dias de resultados são analisados.
+
+A entrada de dados é manual, e não há automação externa.
+
+O sistema processa automaticamente as análises após a inserção dos dados.
+
+A sinalização por cor e a organização dos dados seguem os padrões descritos.
+
+Fora do escopo:
+
+Automação diária de busca de dados externos.
+
+Coleta automática de resultados de sites ou APIs.
+
+Múltiplos usuários ou integração com banco de dados externo.
+
+5. Condições Comerciais
+
+Valor total do projeto: R$ 1.000,00
+Inclui:
+
+Desenvolvimento completo conforme o escopo descrito.
+
+Implementação de todas as funcionalidades do sistema.
+
+Testes e ajustes conforme os feedbacks.
+
+6. Critério de Aceite
+
+O projeto será considerado concluído quando:
+
+O painel estiver online.
+
+Todas as telas e funcionalidades estiverem implementadas conforme o escopo.
+
+O sistema de inserção de dados e cálculos automáticos estiver funcionando corretamente.
+
+Testes realizados e ajustes aplicados conforme necessário.
+
+✅ Confirmação de Aprovação
+
+Por favor, confirme se todos os pontos do escopo estão 100% de acordo com o que você espera para que possamos seguir com a implementação final

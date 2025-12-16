@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Análise por Dias", page_icon="📅", layout="wide")
 
+# Verificação de autenticação
+from modules.auth import check_authentication
+check_authentication()
+
 # CSS customizado com cores por dia
 st.markdown("""
 <style>

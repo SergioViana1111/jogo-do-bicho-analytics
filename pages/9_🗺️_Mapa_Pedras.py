@@ -7,6 +7,10 @@ import pandas as pd
 
 st.set_page_config(page_title="Mapa de Pedras", page_icon="🗺️", layout="wide")
 
+# Verificação de autenticação
+from modules.auth import check_authentication
+check_authentication()
+
 st.markdown("""
 <style>
     .pedra-box {
