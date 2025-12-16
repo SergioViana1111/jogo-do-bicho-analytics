@@ -172,12 +172,13 @@ def get_animal_counts(df_dia):
     return counts
 
 def get_digit_frequency(df_dia, tipo='milhar'):
-    """Conta frequência de cada dígito (0-9) nas pedras"""
+    """Conta frequência do primeiro dígito (pedra) de cada número"""
     freq = {i: 0 for i in range(10)}
     col = 'milhar' if tipo == 'milhar' else 'centena'
     for val in df_dia[col]:
-        for digit in str(val).zfill(4 if tipo == 'milhar' else 3):
-            freq[int(digit)] += 1
+        val_str = str(val).zfill(4 if tipo == 'milhar' else 3)  # Garantir formato correto
+        first_digit = int(val_str[0])  # Extrair apenas o primeiro dígito (pedra)
+        freq[first_digit] += 1
     return freq
 
 # Análise por dia

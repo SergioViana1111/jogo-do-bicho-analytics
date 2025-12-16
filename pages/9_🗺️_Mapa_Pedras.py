@@ -130,19 +130,19 @@ if len(df_5dias) == 0:
     st.stop()
 
 def get_total_freq(df, tipo='milhar'):
-    """Frequência total de cada dígito"""
+    """Frequência total do primeiro dígito (pedra) de cada número"""
     freq = {d: 0 for d in range(10)}
     col = 'milhar' if tipo == 'milhar' else 'centena'
     
     for val in df[col]:
-        for digit in str(val):
-            if digit.isdigit():
-                freq[int(digit)] += 1
+        val_str = str(val).zfill(4 if tipo == 'milhar' else 3)  # Garantir formato correto
+        first_digit = int(val_str[0])  # Extrair apenas o primeiro dígito (pedra)
+        freq[first_digit] += 1
     
     return freq
 
 def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
-    """Frequência de dígitos por dia"""
+    """Frequência do primeiro dígito (pedra) por dia"""
     freq_by_day = {dia: {d: 0 for d in range(10)} for dia in range(1, 6)}
     col = 'milhar' if tipo == 'milhar' else 'centena'
     datas = get_last_5_unique_dates(df_full, loteria)
@@ -154,9 +154,9 @@ def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
         df_dia = df[df['data'].dt.date == data]
         
         for val in df_dia[col]:
-            for digit in str(val):
-                if digit.isdigit():
-                    freq_by_day[dia_num][int(digit)] += 1
+            val_str = str(val).zfill(4 if tipo == 'milhar' else 3)  # Garantir formato correto
+            first_digit = int(val_str[0])  # Extrair apenas o primeiro dígito (pedra)
+            freq_by_day[dia_num][first_digit] += 1
     
     return freq_by_day
 
