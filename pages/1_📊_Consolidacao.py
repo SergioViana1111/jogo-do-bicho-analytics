@@ -199,51 +199,54 @@ with col3:
 
 st.divider()
 
-# Análise de ausências
+# Análise de ausências - Por Dia e Por Loteria
 st.subheader("🔍 Análise de Ausências")
 
-col1, col2 = st.columns(2)
+# Obter todas as loterias disponíveis
+todas_loterias = df['loteria'].unique().tolist()
 
-with col1:
-    st.markdown("#### Grupos que NÃO saíram (últimos 5 dias)")
+# Para cada dia, mostrar os grupos que NÃO saíram em cada loteria
+for idx, data in enumerate(datas_5dias):
+    dia_num = idx + 1
+    cor_info = DIA_CORES[dia_num]
+    data_formatada = data.strftime('%d/%m/%Y')
     
-    grupos_presentes = set(df_5dias['grupo'].unique())
-    grupos_ausentes = [g for g in range(1, 26) if g not in grupos_presentes]
+    st.markdown(f"""
+    <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px 15px; 
+                border-radius: 8px; margin: 15px 0 10px 0; font-weight: bold;">
+        {cor_info['emoji']} DIA {dia_num} - {data_formatada}
+    </div>
+    """, unsafe_allow_html=True)
     
-    if grupos_ausentes:
-        # Para cada grupo ausente, encontrar em qual dia ele apareceu
-        for g in grupos_ausentes:
-            animal = GRUPOS_ANIMAIS.get(g, '')
+    # Criar colunas para cada loteria
+    cols = st.columns(len(todas_loterias))
+    
+    for col_idx, loteria in enumerate(todas_loterias):
+        with cols[col_idx]:
+            # Filtrar dados do dia específico para essa loteria
+            df_dia_loteria = df[(df['data'].dt.date == data) & (df['loteria'] == loteria)]
             
-            # Verificar em qual dia o grupo apareceu
-            dias_grupo = []
-            for idx, data in enumerate(datas_5dias):
-                dia_num = idx + 1
-                df_dia = df_5dias[df_5dias['data'].dt.date == data]
-                if g in df_dia['grupo'].values:
-                    cor_info = DIA_CORES[dia_num]
-                    dias_grupo.append(f"{cor_info['emoji']} DIA {dia_num}")
+            grupos_presentes = set(df_dia_loteria['grupo'].unique())
+            grupos_ausentes = [g for g in range(1, 26) if g not in grupos_presentes]
             
-            # Se não apareceu em nenhum dos 5 dias
-            if dias_grupo:
-                dias_str = ", ".join(dias_grupo)
-                st.markdown(f"- **{g:02d}** - {animal} ({dias_str})")
+            st.markdown(f"**{loteria}**")
+            
+            if len(df_dia_loteria) == 0:
+                st.caption("Sem resultados")
+            elif grupos_ausentes:
+                # Mostrar grupos ausentes com nome do animal
+                ausentes_str = ", ".join([f"{g:02d}" for g in grupos_ausentes[:10]])
+                if len(grupos_ausentes) > 10:
+                    ausentes_str += f" (+{len(grupos_ausentes) - 10})"
+                st.markdown(f"🚫 {ausentes_str}")
+                
+                # Expander para ver todos
+                if len(grupos_ausentes) > 5:
+                    with st.expander(f"Ver todos ({len(grupos_ausentes)} grupos)"):
+                        for g in grupos_ausentes:
+                            animal = GRUPOS_ANIMAIS.get(g, '')
+                            st.caption(f"{g:02d} - {animal}")
             else:
-                st.markdown(f"- **{g:02d}** - {animal} (❌ Ausente em todos os 5 dias)")
-    else:
-        st.success("✅ Todos os 25 grupos apareceram!")
-
-with col2:
-    st.markdown("#### Distribuição por Dia")
-    
-    for idx, data in enumerate(datas_5dias):
-        dia_num = idx + 1
-        cor_info = DIA_CORES[dia_num]
-        df_dia = df_5dias[df_5dias['data'].dt.date == data]
-        
-        st.markdown(f"""
-        {cor_info['emoji']} **DIA {dia_num}** ({data.strftime('%d/%m')}): 
-        {len(df_dia)} resultados, {df_dia['grupo'].nunique()} grupos únicos
-        """)
+                st.success("✅ Todos saíram!")
 
 st.caption("⚠️ Consolidação estatística dos últimos 5 dias. Ordenação por FREQUÊNCIA, não cronológica. Cada loteria é analisada separadamente.")
