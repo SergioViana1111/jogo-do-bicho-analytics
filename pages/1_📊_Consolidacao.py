@@ -211,9 +211,25 @@ with col1:
     grupos_ausentes = [g for g in range(1, 26) if g not in grupos_presentes]
     
     if grupos_ausentes:
+        # Para cada grupo ausente, encontrar em qual dia ele apareceu
         for g in grupos_ausentes:
             animal = GRUPOS_ANIMAIS.get(g, '')
-            st.markdown(f"- **{g:02d}** - {animal}")
+            
+            # Verificar em qual dia o grupo apareceu
+            dias_grupo = []
+            for idx, data in enumerate(datas_5dias):
+                dia_num = idx + 1
+                df_dia = df_5dias[df_5dias['data'].dt.date == data]
+                if g in df_dia['grupo'].values:
+                    cor_info = DIA_CORES[dia_num]
+                    dias_grupo.append(f"{cor_info['emoji']} DIA {dia_num}")
+            
+            # Se não apareceu em nenhum dos 5 dias
+            if dias_grupo:
+                dias_str = ", ".join(dias_grupo)
+                st.markdown(f"- **{g:02d}** - {animal} ({dias_str})")
+            else:
+                st.markdown(f"- **{g:02d}** - {animal} (❌ Ausente em todos os 5 dias)")
     else:
         st.success("✅ Todos os 25 grupos apareceram!")
 
