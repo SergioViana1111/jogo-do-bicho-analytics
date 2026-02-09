@@ -238,6 +238,7 @@ def _load_supabase() -> pd.DataFrame:
         return pd.DataFrame(columns=COLUNAS_DB)
     except Exception as e:
         print(f"[DB] Erro Supabase load: {e}")
+        st.error(f"Erro ao carregar do Supabase: {e}")
         return pd.DataFrame(columns=COLUNAS_DB)
 
 def _load_sqlite() -> pd.DataFrame:
@@ -262,6 +263,7 @@ def _load_sqlite() -> pd.DataFrame:
         return df
     except Exception as e:
         print(f"[DB] Erro SQLite load: {e}")
+        st.error(f"Erro ao carregar do SQLite: {e}")
         return pd.DataFrame(columns=COLUNAS_DB)
 
 def load_data_by_loteria(loteria: str) -> pd.DataFrame:
