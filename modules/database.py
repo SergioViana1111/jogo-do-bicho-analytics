@@ -209,6 +209,9 @@ def load_all_data() -> pd.DataFrame:
     else:
         return _load_sqlite()
 
+# Colunas esperadas no banco de dados
+COLUNAS_DB = ['id', 'data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']
+
 def _load_supabase() -> pd.DataFrame:
     """Carrega do Supabase"""
     try:
@@ -219,12 +222,18 @@ def _load_supabase() -> pd.DataFrame:
             df = pd.DataFrame(result.data)
             if 'data' in df.columns:
                 df['data'] = pd.to_datetime(df['data'])
+            
+            # Garantir que todas as colunas existem
+            for col in COLUNAS_DB:
+                if col not in df.columns and col != 'id':
+                    df[col] = None
+                    
             print(f"[DB] Supabase: {len(df)} registros carregados")
             return df
-        return pd.DataFrame()
+        return pd.DataFrame(columns=COLUNAS_DB)
     except Exception as e:
         print(f"[DB] Erro Supabase load: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=COLUNAS_DB)
 
 def _load_sqlite() -> pd.DataFrame:
     """Carrega do SQLite"""
@@ -248,7 +257,7 @@ def _load_sqlite() -> pd.DataFrame:
         return df
     except Exception as e:
         print(f"[DB] Erro SQLite load: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=COLUNAS_DB)
 
 def load_data_by_loteria(loteria: str) -> pd.DataFrame:
     """Carrega dados de uma loteria específica"""
