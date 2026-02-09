@@ -291,7 +291,7 @@ if 'df_processados' in st.session_state and st.session_state.df_processados is n
                 df_add['data'] = pd.to_datetime(df_add['data'])
                 
                 # Salvar no banco de dados
-                inseridos, duplicados = save_data_to_database(df_add)
+                inseridos, duplicados, erros = save_data_to_database(df_add)
                 
                 # Recarregar dados do banco para session_state
                 st.session_state.dados = load_data_from_database()
@@ -299,6 +299,9 @@ if 'df_processados' in st.session_state and st.session_state.df_processados is n
                 
                 # Limpar dados processados
                 st.session_state.df_processados = None
+                
+                if erros:
+                    st.error(f"❌ Erro ao salvar alguns registros: {erros}")
                 
                 if inseridos > 0:
                     st.success(f"✅ {inseridos} registros salvos! Total: {len(st.session_state.dados)} registros.")

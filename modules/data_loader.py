@@ -14,10 +14,10 @@ def load_data_from_database():
     from modules.database import load_all_data
     return load_all_data()
 
-def save_data_to_database(df: pd.DataFrame) -> tuple[int, int]:
+def save_data_to_database(df: pd.DataFrame) -> tuple:
     """
     Salva dados no banco de dados SQLite.
-    Retorna (inseridos, duplicados)
+    Retorna (inseridos, duplicados, erros)
     """
     # Import lazy para evitar import circular
     from modules.database import insert_resultados

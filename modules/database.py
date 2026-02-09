@@ -98,10 +98,10 @@ def get_connection():
 def insert_resultados(df: pd.DataFrame) -> tuple:
     """
     Insere resultados no armazenamento.
-    Retorna (inseridos, duplicados)
+    Retorna (inseridos, duplicados, erros)
     """
     if df is None or len(df) == 0:
-        return 0, 0
+        return 0, 0, None
     
     if _is_supabase_available():
         return _insert_supabase(df)
@@ -154,7 +154,7 @@ def _insert_supabase(df: pd.DataFrame) -> tuple:
                 duplicados += 1
     
     print(f"[DB] Supabase: {inseridos} inseridos, {duplicados} duplicados")
-    return inseridos, duplicados
+    return inseridos, duplicados, None 
 
 def _insert_sqlite(df: pd.DataFrame) -> tuple:
     """Insere no SQLite local"""
@@ -165,6 +165,8 @@ def _insert_sqlite(df: pd.DataFrame) -> tuple:
     
     inseridos = 0
     duplicados = 0
+    erros = 0
+    msg_erro = ""
     
     for _, row in df.iterrows():
         try:
@@ -195,12 +197,15 @@ def _insert_sqlite(df: pd.DataFrame) -> tuple:
                 
         except Exception as e:
             print(f"[DB] Erro SQLite insert: {e}")
-            duplicados += 1
+            erros += 1
+            msg_erro = str(e)
     
     conn.commit()
     conn.close()
-    print(f"[DB] SQLite: {inseridos} inseridos, {duplicados} duplicados")
-    return inseridos, duplicados
+    print(f"[DB] SQLite: {inseridos} inseridos, {duplicados} duplicados, {erros} erros")
+    if erros > 0:
+        return inseridos, duplicados, msg_erro
+    return inseridos, duplicados, None
 
 def load_all_data() -> pd.DataFrame:
     """Carrega todos os dados"""
