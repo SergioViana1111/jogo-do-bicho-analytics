@@ -415,6 +415,11 @@ if 'dados' in st.session_state and st.session_state.dados is not None:
         
         # Mostrar quantos registros serão afetados
         del_data_str = del_data.strftime('%Y-%m-%d')
+        
+        # Garantir que a coluna 'data' seja datetime antes de usar .dt
+        if st.session_state.dados['data'].dtype == 'object':
+            st.session_state.dados['data'] = pd.to_datetime(st.session_state.dados['data'], errors='coerce')
+
         registros_filtro = st.session_state.dados[
             (st.session_state.dados['loteria'] == del_loteria) &
             (st.session_state.dados['data'].dt.strftime('%Y-%m-%d') == del_data_str) &
