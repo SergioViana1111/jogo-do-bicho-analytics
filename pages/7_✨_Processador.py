@@ -327,6 +327,10 @@ if 'dados' in st.session_state and st.session_state.dados is not None:
     df_loteria = st.session_state.dados[st.session_state.dados['loteria'] == loteria_selecionada].copy()
     
     # Filtrar também pela data selecionada
+    # Garantir que a coluna 'data' seja datetime antes de usar .dt
+    if df_loteria['data'].dtype == 'object':
+        df_loteria['data'] = pd.to_datetime(df_loteria['data'], errors='coerce')
+        
     data_filtro_str = data_resultado.strftime('%Y-%m-%d')
     df_loteria_data = df_loteria[df_loteria['data'].dt.strftime('%Y-%m-%d') == data_filtro_str].copy()
     
