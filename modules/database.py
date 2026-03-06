@@ -64,12 +64,21 @@ def _init_sqlite_tables(conn):
             centena INTEGER NOT NULL,
             milhar INTEGER NOT NULL,
             animal TEXT,
+            premio INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(data, loteria, horario, milhar)
         )
     ''')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_loteria ON resultados(loteria)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_data ON resultados(data)')
+    
+    # Migração: adicionar coluna premio se não existir (para bases legadas)
+    try:
+        cursor.execute('ALTER TABLE resultados ADD COLUMN premio INTEGER DEFAULT 0')
+        print('[DB] Migração: coluna premio adicionada')
+    except Exception:
+        pass  # Coluna já existe
+    
     conn.commit()
 
 # ========================
@@ -104,7 +113,15 @@ def insert_resultados(df: pd.DataFrame) -> tuple:
         return 0, 0, None
     
     if _is_supabase_available():
-        return _insert_supabase(df)
+        # Tenta Supabase primeiro
+        result = _insert_supabase(df)
+        # Se houve erro no Supabase (ignorando "duplicados" que não é erro de sistema)
+        # result[2] contém a msg de erro
+        if result[2] is not None:
+            print(f"[DB] Falha no Supabase ({result[2]}), tentando SQLite local...")
+            st.warning(f"⚠️ Erro de conexão com Supabase. Salvando localmente (SQLite). Detalhe: {result[2]}")
+            return _insert_sqlite(df)
+        return result
     else:
         return _insert_sqlite(df)
 
@@ -114,6 +131,10 @@ def _insert_supabase(df: pd.DataFrame) -> tuple:
     
     inseridos = 0
     duplicados = 0
+    erros = 0
+    msg_erro = ""
+    
+    # ... resto do código mantido ...
     
     for _, row in df.iterrows():
         try:
@@ -132,7 +153,8 @@ def _insert_supabase(df: pd.DataFrame) -> tuple:
                 'grupo': int(row['grupo']),
                 'centena': int(row['centena']),
                 'milhar': int(row['milhar']),
-                'animal': row.get('animal', '')
+                'animal': row.get('animal', ''),
+                'premio': int(row.get('premio', 0))
             }
             
             # Usar INSERT simples (não upsert)
@@ -151,12 +173,16 @@ def _insert_supabase(df: pd.DataFrame) -> tuple:
                 print(f"[DB] Duplicado: {record['milhar']}")
             else:
                 print(f"[DB] Erro Supabase: {e}")
-                duplicados += 1
+                erros += 1
+                msg_erro = str(e)
     
     print(f"[DB] Supabase: {inseridos} inseridos, {duplicados} duplicados")
-    return inseridos, duplicados, None 
+    if erros > 0:
+        return inseridos, duplicados, msg_erro
+    return inseridos, duplicados, None
 
 def _insert_sqlite(df: pd.DataFrame) -> tuple:
+    # ... (código existente movido para referência, mas mantido igual) ...
     """Insere no SQLite local"""
     import sqlite3
     conn = _get_sqlite_connection()
@@ -178,8 +204,8 @@ def _insert_sqlite(df: pd.DataFrame) -> tuple:
             
             cursor.execute('''
                 INSERT OR IGNORE INTO resultados 
-                (data, loteria, horario, grupo, centena, milhar, animal)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (data, loteria, horario, grupo, centena, milhar, animal, premio)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data,
                 row['loteria'],
@@ -187,7 +213,8 @@ def _insert_sqlite(df: pd.DataFrame) -> tuple:
                 int(row['grupo']),
                 int(row['centena']),
                 int(row['milhar']),
-                row.get('animal', '')
+                row.get('animal', ''),
+                int(row.get('premio', 0))
             ))
             
             if cursor.rowcount > 0:
@@ -210,15 +237,24 @@ def _insert_sqlite(df: pd.DataFrame) -> tuple:
 def load_all_data() -> pd.DataFrame:
     """Carrega todos os dados"""
     if _is_supabase_available():
-        return _load_supabase()
+        df = _load_supabase()
+        # Se retornar None, falhou. Tentar SQLite.
+        if df is None:
+            print("[DB] Fallback para SQLite após falha no Supabase")
+            # Avisar usuário apenas na primeira vez para não poluir
+            if 'fallback_warned' not in st.session_state:
+                st.warning("⚠️ Não foi possível conectar ao banco online. Usando dados locais (SQLite).")
+                st.session_state.fallback_warned = True
+            return _load_sqlite()
+        return df
     else:
         return _load_sqlite()
 
 # Colunas esperadas no banco de dados
-COLUNAS_DB = ['id', 'data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']
+COLUNAS_DB = ['id', 'data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal', 'premio']
 
-def _load_supabase() -> pd.DataFrame:
-    """Carrega do Supabase"""
+def _load_supabase() -> pd.DataFrame | None:
+    """Carrega do Supabase. Retorna None em caso de erro crítico."""
     try:
         client = st.session_state._supabase_client
         result = client.table('resultados').select('*').order('data', desc=True).execute()
@@ -235,11 +271,12 @@ def _load_supabase() -> pd.DataFrame:
                     
             print(f"[DB] Supabase: {len(df)} registros carregados")
             return df
+        # Retornar DataFrame vazio válido se conectar mas não tiver dados
         return pd.DataFrame(columns=COLUNAS_DB)
     except Exception as e:
         print(f"[DB] Erro Supabase load: {e}")
-        st.error(f"Erro ao carregar do Supabase: {e}")
-        return pd.DataFrame(columns=COLUNAS_DB)
+        # Retorna None para indicar que deve tentar fallback
+        return None
 
 def _load_sqlite() -> pd.DataFrame:
     """Carrega do SQLite"""
@@ -249,7 +286,8 @@ def _load_sqlite() -> pd.DataFrame:
         _init_sqlite_tables(conn)
         
         df = pd.read_sql_query('''
-            SELECT data, loteria, horario, grupo, centena, milhar, animal
+            SELECT data, loteria, horario, grupo, centena, milhar, animal, 
+                   COALESCE(premio, 0) as premio
             FROM resultados
             ORDER BY data DESC, horario
         ''', conn)
@@ -287,19 +325,24 @@ def get_record_count() -> int:
             client = st.session_state._supabase_client
             result = client.table('resultados').select('*', count='exact').execute()
             return result.count or 0
-        except:
-            return 0
+        except Exception as e:
+            print(f"[DB] Erro count Supabase: {e}")
+            return _get_sqlite_count()
     else:
-        try:
-            import sqlite3
-            conn = _get_sqlite_connection()
-            cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM resultados')
-            count = cursor.fetchone()[0]
-            conn.close()
-            return count
-        except:
-            return 0
+        return _get_sqlite_count()
+
+def _get_sqlite_count() -> int:
+    try:
+        import sqlite3
+        conn = _get_sqlite_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM resultados')
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+    except Exception as e:
+        print(f"[DB] Erro count SQLite: {e}")
+        return 0
 
 def delete_records_by_filter(loteria: str, data: str, horario: str) -> int:
     """
@@ -315,24 +358,28 @@ def delete_records_by_filter(loteria: str, data: str, horario: str) -> int:
             return deleted_count
         except Exception as e:
             print(f"[DB] Erro ao deletar Supabase: {e}")
-            return 0
+            # Fallback
+            return _delete_sqlite(loteria, data, horario)
     else:
-        try:
-            import sqlite3
-            conn = _get_sqlite_connection()
-            cursor = conn.cursor()
-            cursor.execute('''
-                DELETE FROM resultados 
-                WHERE loteria = ? AND data = ? AND horario = ?
-            ''', (loteria, data, horario))
-            deleted_count = cursor.rowcount
-            conn.commit()
-            conn.close()
-            print(f"[DB] SQLite: {deleted_count} registros deletados")
-            return deleted_count
-        except Exception as e:
-            print(f"[DB] Erro ao deletar SQLite: {e}")
-            return 0
+        return _delete_sqlite(loteria, data, horario)
+
+def _delete_sqlite(loteria, data, horario) -> int:
+    try:
+        import sqlite3
+        conn = _get_sqlite_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            DELETE FROM resultados 
+            WHERE loteria = ? AND data = ? AND horario = ?
+        ''', (loteria, data, horario))
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        print(f"[DB] SQLite: {deleted_count} registros deletados")
+        return deleted_count
+    except Exception as e:
+        print(f"[DB] Erro ao deletar SQLite: {e}")
+        return 0
 
 def delete_all_records() -> int:
     """
@@ -350,21 +397,25 @@ def delete_all_records() -> int:
             return deleted_count
         except Exception as e:
             print(f"[DB] Erro ao deletar Supabase: {e}")
-            return 0
+            # Fallback
+            return _delete_all_sqlite()
     else:
-        try:
-            import sqlite3
-            conn = _get_sqlite_connection()
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM resultados')
-            deleted_count = cursor.rowcount
-            conn.commit()
-            conn.close()
-            print(f"[DB] SQLite: {deleted_count} registros deletados")
-            return deleted_count
-        except Exception as e:
-            print(f"[DB] Erro ao deletar SQLite: {e}")
-            return 0
+        return _delete_all_sqlite()
+
+def _delete_all_sqlite() -> int:
+    try:
+        import sqlite3
+        conn = _get_sqlite_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM resultados')
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        print(f"[DB] SQLite: {deleted_count} registros deletados")
+        return deleted_count
+    except Exception as e:
+        print(f"[DB] Erro ao deletar SQLite: {e}")
+        return 0
 
 # Inicializar ao importar
 try:

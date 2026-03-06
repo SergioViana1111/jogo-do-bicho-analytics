@@ -66,7 +66,8 @@ if 'dados' not in st.session_state or st.session_state.dados is None:
 
 from modules.data_loader import (
     GRUPOS_ANIMAIS, DIA_CORES, 
-    filter_5_day_cycle, get_day_number, get_last_5_unique_dates, get_day_color
+    filter_5_day_cycle, get_day_number, get_last_5_unique_dates, get_day_color,
+    filter_day_data_by_prize
 )
 
 df = st.session_state.dados
@@ -137,18 +138,24 @@ for idx, data in enumerate(datas_5dias):
     df_dia = df_5dias[df_5dias['data'].dt.date == data]
     data_formatada = data.strftime('%d/%m/%Y')
     
+    # Aplicar regra de prêmio
+    df_dia_filtrado = filter_day_data_by_prize(df_dia, dia_num)
+    
+    # Label de regra
+    regra_label = "TODOS" if dia_num <= 2 else "1° PRÊMIO"
+    
     # Header do dia com cor
     st.markdown(f"""
     <div style="display: flex; align-items: center; gap: 10px; margin: 15px 0;">
         <span class="day-indicator" style="background: {cor_info['cor']}; color: {cor_info['text_color']};">
-            {cor_info['emoji']} DIA {dia_num}
+            {cor_info['emoji']} DIA {dia_num} — {regra_label}
         </span>
         <span style="font-size: 1.2rem; font-weight: bold;">{data_formatada}</span>
     </div>
     """, unsafe_allow_html=True)
     
-    # Grid de resultados do dia
-    for _, row in df_dia.iterrows():
+    # Grid de resultados do dia (usando dados filtrados)
+    for _, row in df_dia_filtrado.iterrows():
         col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 2])
         
         with col1:

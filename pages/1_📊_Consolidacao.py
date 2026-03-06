@@ -78,7 +78,8 @@ if 'dados' not in st.session_state or st.session_state.dados is None:
     st.stop()
 
 from modules.data_loader import (
-    GRUPOS_ANIMAIS, DIA_CORES, filter_5_day_cycle, get_last_5_unique_dates
+    GRUPOS_ANIMAIS, DIA_CORES, filter_5_day_cycle, get_last_5_unique_dates,
+    filter_by_day_prize_rules, filter_day_data_by_prize
 )
 from modules import statistics as stats
 
@@ -112,6 +113,9 @@ if len(df_5dias) == 0:
     st.warning(f"⚠️ Nenhum dado encontrado para a loteria **{loteria_selecionada}**.")
     st.stop()
 
+# Dados filtrados com regra de prêmio para análises
+df_5dias_filtered = filter_by_day_prize_rules(df, loteria_selecionada)
+
 # Métricas gerais
 st.subheader(f"📈 Resumo - {loteria_selecionada}")
 
@@ -135,7 +139,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown("### 🐾 Grupos Mais Frequentes")
     
-    grupos_freq = df_5dias['grupo'].value_counts().reset_index()
+    grupos_freq = df_5dias_filtered['grupo'].value_counts().reset_index()
     grupos_freq.columns = ['Grupo', 'Frequência']
     grupos_freq['Animal'] = grupos_freq['Grupo'].map(GRUPOS_ANIMAIS)
     grupos_freq['Grupo'] = grupos_freq['Grupo'].apply(lambda x: f"{x:02d}")
@@ -158,7 +162,7 @@ with col1:
 with col2:
     st.markdown("### 💯 Centenas Mais Frequentes")
     
-    centenas_freq = df_5dias['centena'].value_counts().reset_index()
+    centenas_freq = df_5dias_filtered['centena'].value_counts().reset_index()
     centenas_freq.columns = ['Centena', 'Frequência']
     centenas_freq['Centena'] = centenas_freq['Centena'].apply(lambda x: f"{x:03d}")
     
@@ -179,7 +183,7 @@ with col2:
 with col3:
     st.markdown("### 🔢 Milhares Mais Frequentes")
     
-    milhares_freq = df_5dias['milhar'].value_counts().reset_index()
+    milhares_freq = df_5dias_filtered['milhar'].value_counts().reset_index()
     milhares_freq.columns = ['Milhar', 'Frequência']
     milhares_freq['Milhar'] = milhares_freq['Milhar'].apply(lambda x: f"{x:04d}")
     
@@ -225,6 +229,9 @@ for idx, data in enumerate(datas_5dias):
         with cols[col_idx]:
             # Filtrar dados do dia específico para essa loteria
             df_dia_loteria = df[(df['data'].dt.date == data) & (df['loteria'] == loteria)]
+            
+            # Aplicar regra de prêmio
+            df_dia_loteria = filter_day_data_by_prize(df_dia_loteria, dia_num)
             
             grupos_presentes = set(df_dia_loteria['grupo'].unique())
             grupos_ausentes = [g for g in range(1, 26) if g not in grupos_presentes]

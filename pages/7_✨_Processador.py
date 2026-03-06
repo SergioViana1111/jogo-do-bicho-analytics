@@ -169,6 +169,14 @@ if processar and resultados_texto:
             if not re.search(r'\d', linha_limpa):
                 continue
             
+            # Extrair número de ordem/prêmio ANTES de removê-lo (ex: "1:", "2:")
+            premio = 0
+            premio_match = re.match(r'^(\d+)[:\.\)]\s*', linha_limpa)
+            if premio_match:
+                premio_num = int(premio_match.group(1))
+                if 1 <= premio_num <= 5:
+                    premio = premio_num
+            
             # Remover número de ordem se existir (ex: "1:", "2:")
             linha_limpa = re.sub(r'^\d+[:\.\)]\s*', '', linha_limpa)
             
@@ -220,6 +228,7 @@ if processar and resultados_texto:
                 'data': data_resultado,
                 'loteria': loteria_selecionada,
                 'horario': horario_selecionado,
+                'premio': premio,
                 'grupo': grupo,
                 'centena': centena,
                 'milhar': milhar,
@@ -247,12 +256,14 @@ if processar and resultados_texto:
         df_display['grupo'] = df_display['grupo'].apply(lambda x: f"{x:02d}")
         df_display['centena'] = df_display['centena'].apply(lambda x: f"{x:03d}")
         df_display['milhar'] = df_display['milhar'].apply(lambda x: f"{x:04d}")
+        df_display['premio'] = df_display['premio'].apply(lambda x: f"{x}°" if x > 0 else "—")
         
         st.dataframe(
-            df_display[['data', 'loteria', 'horario', 'grupo', 'animal', 'centena', 'milhar']].rename(columns={
+            df_display[['data', 'loteria', 'horario', 'premio', 'grupo', 'animal', 'centena', 'milhar']].rename(columns={
                 'data': 'Data',
                 'loteria': 'Loteria',
                 'horario': 'Horário',
+                'premio': 'Prêmio',
                 'grupo': 'Grupo',
                 'animal': 'Animal',
                 'centena': 'Centena',
@@ -287,7 +298,7 @@ if 'df_processados' in st.session_state and st.session_state.df_processados is n
         if st.button("➕ ADICIONAR À BASE DE DADOS", type="primary", use_container_width=True):
             try:
                 # Preparar dados para adicionar
-                df_add = df_novos[['data', 'loteria', 'horario', 'grupo', 'centena', 'milhar', 'animal']].copy()
+                df_add = df_novos[['data', 'loteria', 'horario', 'premio', 'grupo', 'centena', 'milhar', 'animal']].copy()
                 df_add['data'] = pd.to_datetime(df_add['data'])
                 
                 # Salvar no banco de dados

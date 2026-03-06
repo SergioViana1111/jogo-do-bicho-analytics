@@ -119,7 +119,8 @@ if 'dados' not in st.session_state or st.session_state.dados is None:
 
 from modules.data_loader import (
     GRUPOS_ANIMAIS, DIA_CORES, 
-    get_last_5_unique_dates, get_day_number, filter_5_day_cycle, get_day_color
+    get_last_5_unique_dates, get_day_number, filter_5_day_cycle, get_day_color,
+    filter_day_data_by_prize
 )
 
 df = st.session_state.dados
@@ -193,15 +194,24 @@ for idx, data in enumerate(datas_5dias):
     
     data_formatada = data.strftime('%d/%m/%Y')
     
+    # Aplicar regra de prêmio ao dia
+    df_dia_filtrado = filter_day_data_by_prize(df_dia, dia_num)
+    
+    # Label de regra do dia
+    if dia_num <= 2:
+        regra_label = "TODOS OS PRÊMIOS"
+    else:
+        regra_label = "SOMENTE 1° PRÊMIO"
+    
     # Header com cor do dia
     st.markdown(f'''
     <div class="{config['classe']}">
-        {cor_info['emoji']} ANÁLISE - {config['nome']} ({data_formatada})
+        {cor_info['emoji']} ANÁLISE - {config['nome']} ({data_formatada}) — {regra_label}
     </div>
     ''', unsafe_allow_html=True)
     
-    # Grid de animais (5 colunas x 5 linhas)
-    animal_counts = get_animal_counts(df_dia)
+    # Grid de animais (5 colunas x 5 linhas) - usa dados filtrados
+    animal_counts = get_animal_counts(df_dia_filtrado)
     
     # Criar grid de animais
     cols = st.columns(5)
@@ -230,97 +240,159 @@ for idx, data in enumerate(datas_5dias):
     
     st.divider()
     
-    # Tabela de Dezenas e Frequência de Pedras lado a lado
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown(f"### 📋 Tabela de Dezenas - DIA {dia_num}")
+    # Tabela de Dezenas (SOMENTE dias 1 e 2) e Frequência de Pedras
+    if dia_num <= 2:
+        # Layout com dezenas e pedras lado a lado
+        col1, col2 = st.columns(2)
         
-        # Criar tabela de dezenas
-        dezenas_data = []
-        dezenas_found = {}
+        with col1:
+            st.markdown(f"### 📋 Tabela de Dezenas - DIA {dia_num}")
+            
+            # Criar tabela de dezenas (usa dados filtrados)
+            dezenas_data = []
+            dezenas_found = {}
+            
+            for _, row in df_dia_filtrado.iterrows():
+                grupo = row['grupo']
+                milhar = str(row['milhar']).zfill(4)
+                dezena = milhar[-2:]
+                if grupo not in dezenas_found:
+                    dezenas_found[grupo] = []
+                dezenas_found[grupo].append(dezena)
+            
+            for grupo in range(1, 26):
+                animal = GRUPOS_ANIMAIS.get(grupo, '')
+                dezenas = ', '.join(dezenas_found.get(grupo, []))
+                dezenas_data.append({
+                    'Grupo': f"{grupo:02d}",
+                    'Nome': animal,
+                    'Dezenas': dezenas if dezenas else '—'
+                })
+            
+            df_dezenas = pd.DataFrame(dezenas_data)
+            st.dataframe(df_dezenas, use_container_width=True, hide_index=True, height=400)
         
-        for _, row in df_dia.iterrows():
-            grupo = row['grupo']
-            milhar = str(row['milhar']).zfill(4)
-            # Dezena é os 2 últimos dígitos
-            dezena = milhar[-2:]
-            if grupo not in dezenas_found:
-                dezenas_found[grupo] = []
-            dezenas_found[grupo].append(dezena)
+        with col2:
+            # Frequência de Pedras - Milhar
+            st.markdown(f"""
+            <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
+                            font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
+                    FREQUÊNCIA DE PEDRAS - MILHAR (DIA {dia_num})
+                </div>
+            """, unsafe_allow_html=True)
+            
+            freq_milhar = get_digit_frequency(df_dia_filtrado, 'milhar')
+            
+            freq_html = ""
+            for digit in range(10):
+                count = freq_milhar[digit]
+                freq_html += f'<div style="color: #FFD700; font-family: monospace; padding: 2px 10px;">{digit} = {"█" * count} {count}</div>'
+            
+            max_freq = max(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 0
+            min_freq = min(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 0
+            max_digits = [d for d, f in freq_milhar.items() if f == max_freq and max_freq > 0]
+            min_digits = [d for d, f in freq_milhar.items() if f == min_freq]
+            nunca = [d for d, f in freq_milhar.items() if f == 0]
+            
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; margin-top: 10px; padding: 5px 10px;">PEDRA MAIS FREQUENTE = {", ".join(map(str, max_digits)) if max_digits else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRA MENOS FREQUENTE = {", ".join(map(str, min_digits)) if min_digits else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRAS QUE NUNCA SAÍRAM = {", ".join(map(str, nunca)) if nunca else "Nenhuma"}</div>'
+            
+            freq_html += "</div>"
+            st.markdown(freq_html, unsafe_allow_html=True)
+            
+            # Frequência de Pedras - Centena
+            st.markdown(f"""
+            <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px;">
+                <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
+                            font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
+                    FREQUÊNCIA DE PEDRAS - CENTENA (DIA {dia_num})
+                </div>
+            """, unsafe_allow_html=True)
+            
+            freq_centena = get_digit_frequency(df_dia_filtrado, 'centena')
+            
+            freq_html = ""
+            for digit in range(10):
+                count = freq_centena[digit]
+                freq_html += f'<div style="color: #FFD700; font-family: monospace; padding: 2px 10px;">{digit} = {"█" * count} {count}</div>'
+            
+            max_freq_c = max(freq_centena.values()) if sum(freq_centena.values()) > 0 else 0
+            min_freq_c = min(freq_centena.values()) if sum(freq_centena.values()) > 0 else 0
+            max_digits_c = [d for d, f in freq_centena.items() if f == max_freq_c and max_freq_c > 0]
+            min_digits_c = [d for d, f in freq_centena.items() if f == min_freq_c]
+            nunca_c = [d for d, f in freq_centena.items() if f == 0]
+            
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; margin-top: 10px; padding: 5px 10px;">PEDRA MAIS FREQUENTE = {", ".join(map(str, max_digits_c)) if max_digits_c else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRA MENOS FREQUENTE = {", ".join(map(str, min_digits_c)) if min_digits_c else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRAS QUE NUNCA SAÍRAM = {", ".join(map(str, nunca_c)) if nunca_c else "Nenhuma"}</div>'
+            
+            freq_html += "</div>"
+            st.markdown(freq_html, unsafe_allow_html=True)
+    else:
+        # Dias 3, 4 e 5: somente Frequência de Pedras (SEM tabela de dezenas)
+        col1, col2 = st.columns(2)
         
-        for grupo in range(1, 26):
-            animal = GRUPOS_ANIMAIS.get(grupo, '')
-            dezenas = ', '.join(dezenas_found.get(grupo, []))
-            dezenas_data.append({
-                'Grupo': f"{grupo:02d}",
-                'Nome': animal,
-                'Dezenas': dezenas if dezenas else '—'
-            })
+        with col1:
+            # Frequência de Pedras - Milhar
+            st.markdown(f"""
+            <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
+                            font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
+                    FREQUÊNCIA DE PEDRAS - MILHAR (DIA {dia_num}) — 1° PRÊMIO
+                </div>
+            """, unsafe_allow_html=True)
+            
+            freq_milhar = get_digit_frequency(df_dia_filtrado, 'milhar')
+            
+            freq_html = ""
+            for digit in range(10):
+                count = freq_milhar[digit]
+                freq_html += f'<div style="color: #FFD700; font-family: monospace; padding: 2px 10px;">{digit} = {"█" * count} {count}</div>'
+            
+            max_freq = max(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 0
+            min_freq = min(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 0
+            max_digits = [d for d, f in freq_milhar.items() if f == max_freq and max_freq > 0]
+            min_digits = [d for d, f in freq_milhar.items() if f == min_freq]
+            nunca = [d for d, f in freq_milhar.items() if f == 0]
+            
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; margin-top: 10px; padding: 5px 10px;">PEDRA MAIS FREQUENTE = {", ".join(map(str, max_digits)) if max_digits else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRA MENOS FREQUENTE = {", ".join(map(str, min_digits)) if min_digits else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRAS QUE NUNCA SAÍRAM = {", ".join(map(str, nunca)) if nunca else "Nenhuma"}</div>'
+            
+            freq_html += "</div>"
+            st.markdown(freq_html, unsafe_allow_html=True)
         
-        df_dezenas = pd.DataFrame(dezenas_data)
-        st.dataframe(df_dezenas, use_container_width=True, hide_index=True, height=400)
-    
-    with col2:
-        # Frequência de Pedras - Milhar
-        st.markdown(f"""
-        <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
-            <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
-                        font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
-                FREQUÊNCIA DE PEDRAS - MILHAR (DIA {dia_num})
-            </div>
-        """, unsafe_allow_html=True)
-        
-        freq_milhar = get_digit_frequency(df_dia, 'milhar')
-        
-        # Mostrar frequências
-        freq_html = ""
-        for digit in range(10):
-            count = freq_milhar[digit]
-            freq_html += f'<div style="color: #FFD700; font-family: monospace; padding: 2px 10px;">{digit} = {"█" * count} {count}</div>'
-        
-        # Resumo
-        max_freq = max(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 0
-        min_freq = min(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 0
-        max_digits = [d for d, f in freq_milhar.items() if f == max_freq and max_freq > 0]
-        min_digits = [d for d, f in freq_milhar.items() if f == min_freq]
-        nunca = [d for d, f in freq_milhar.items() if f == 0]
-        
-        freq_html += f'<div style="color: #FFD700; font-weight: bold; margin-top: 10px; padding: 5px 10px;">PEDRA MAIS FREQUENTE = {", ".join(map(str, max_digits)) if max_digits else "N/A"}</div>'
-        freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRA MENOS FREQUENTE = {", ".join(map(str, min_digits)) if min_digits else "N/A"}</div>'
-        freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRAS QUE NUNCA SAÍRAM = {", ".join(map(str, nunca)) if nunca else "Nenhuma"}</div>'
-        
-        freq_html += "</div>"
-        st.markdown(freq_html, unsafe_allow_html=True)
-        
-        # Frequência de Pedras - Centena
-        st.markdown(f"""
-        <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px;">
-            <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
-                        font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
-                FREQUÊNCIA DE PEDRAS - CENTENA (DIA {dia_num})
-            </div>
-        """, unsafe_allow_html=True)
-        
-        freq_centena = get_digit_frequency(df_dia, 'centena')
-        
-        freq_html = ""
-        for digit in range(10):
-            count = freq_centena[digit]
-            freq_html += f'<div style="color: #FFD700; font-family: monospace; padding: 2px 10px;">{digit} = {"█" * count} {count}</div>'
-        
-        max_freq_c = max(freq_centena.values()) if sum(freq_centena.values()) > 0 else 0
-        min_freq_c = min(freq_centena.values()) if sum(freq_centena.values()) > 0 else 0
-        max_digits_c = [d for d, f in freq_centena.items() if f == max_freq_c and max_freq_c > 0]
-        min_digits_c = [d for d, f in freq_centena.items() if f == min_freq_c]
-        nunca_c = [d for d, f in freq_centena.items() if f == 0]
-        
-        freq_html += f'<div style="color: #FFD700; font-weight: bold; margin-top: 10px; padding: 5px 10px;">PEDRA MAIS FREQUENTE = {", ".join(map(str, max_digits_c)) if max_digits_c else "N/A"}</div>'
-        freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRA MENOS FREQUENTE = {", ".join(map(str, min_digits_c)) if min_digits_c else "N/A"}</div>'
-        freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRAS QUE NUNCA SAÍRAM = {", ".join(map(str, nunca_c)) if nunca_c else "Nenhuma"}</div>'
-        
-        freq_html += "</div>"
-        st.markdown(freq_html, unsafe_allow_html=True)
+        with col2:
+            # Frequência de Pedras - Centena
+            st.markdown(f"""
+            <div style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                <div style="background: {cor_info['cor']}; color: {cor_info['text_color']}; padding: 10px; text-align: center; 
+                            font-weight: bold; border-radius: 5px; margin-bottom: 10px;">
+                    FREQUÊNCIA DE PEDRAS - CENTENA (DIA {dia_num}) — 1° PRÊMIO
+                </div>
+            """, unsafe_allow_html=True)
+            
+            freq_centena = get_digit_frequency(df_dia_filtrado, 'centena')
+            
+            freq_html = ""
+            for digit in range(10):
+                count = freq_centena[digit]
+                freq_html += f'<div style="color: #FFD700; font-family: monospace; padding: 2px 10px;">{digit} = {"█" * count} {count}</div>'
+            
+            max_freq_c = max(freq_centena.values()) if sum(freq_centena.values()) > 0 else 0
+            min_freq_c = min(freq_centena.values()) if sum(freq_centena.values()) > 0 else 0
+            max_digits_c = [d for d, f in freq_centena.items() if f == max_freq_c and max_freq_c > 0]
+            min_digits_c = [d for d, f in freq_centena.items() if f == min_freq_c]
+            nunca_c = [d for d, f in freq_centena.items() if f == 0]
+            
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; margin-top: 10px; padding: 5px 10px;">PEDRA MAIS FREQUENTE = {", ".join(map(str, max_digits_c)) if max_digits_c else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRA MENOS FREQUENTE = {", ".join(map(str, min_digits_c)) if min_digits_c else "N/A"}</div>'
+            freq_html += f'<div style="color: #FFD700; font-weight: bold; padding: 5px 10px;">PEDRAS QUE NUNCA SAÍRAM = {", ".join(map(str, nunca_c)) if nunca_c else "Nenhuma"}</div>'
+            
+            freq_html += "</div>"
+            st.markdown(freq_html, unsafe_allow_html=True)
     
     st.markdown("---")
 

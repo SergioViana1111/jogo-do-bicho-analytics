@@ -100,6 +100,7 @@ def filter_5_day_cycle(df: pd.DataFrame, loteria: str) -> pd.DataFrame:
     """
     Filtra dados apenas dos últimos 5 dias para uma loteria específica.
     Esta é a janela de análise principal do sistema.
+    NÃO aplica regra de prêmio - retorna TODOS os registros dos 5 dias.
     
     Args:
         df: DataFrame com todos os dados
@@ -124,6 +125,70 @@ def filter_5_day_cycle(df: pd.DataFrame, loteria: str) -> pd.DataFrame:
     
     return df_filtered.sort_values('data', ascending=False)
 
+def filter_by_day_prize_rules(df: pd.DataFrame, loteria: str) -> pd.DataFrame:
+    """
+    Filtra dados dos últimos 5 dias aplicando a REGRA DE PRÊMIO:
+    - Dias 1 e 2: TODOS os prêmios (puxada de todos os bichos)
+    - Dias 3, 4 e 5: SOMENTE 1° prêmio
+    
+    Dados legados (premio=0) são incluídos em todos os dias para compatibilidade.
+    
+    Args:
+        df: DataFrame com todos os dados
+        loteria: Nome da loteria para filtrar
+    
+    Returns:
+        DataFrame filtrado com a regra de prêmio aplicada
+    """
+    df_5dias = filter_5_day_cycle(df, loteria)
+    
+    if len(df_5dias) == 0:
+        return pd.DataFrame()
+    
+    datas_5dias = get_last_5_unique_dates(df, loteria)
+    
+    # Garantir coluna premio existe
+    if 'premio' not in df_5dias.columns:
+        df_5dias['premio'] = 0
+    
+    resultado_parts = []
+    
+    for idx, data in enumerate(datas_5dias):
+        dia_num = idx + 1
+        df_dia = df_5dias[df_5dias['data'].dt.date == data]
+        
+        if dia_num <= 2:
+            # Dias 1 e 2: todos os prêmios
+            resultado_parts.append(df_dia)
+        else:
+            # Dias 3, 4 e 5: somente 1° prêmio (premio==1) ou legado (premio==0)
+            df_filtrado = df_dia[(df_dia['premio'] == 1) | (df_dia['premio'] == 0)]
+            resultado_parts.append(df_filtrado)
+    
+    if resultado_parts:
+        return pd.concat(resultado_parts, ignore_index=True).sort_values('data', ascending=False)
+    
+    return pd.DataFrame()
+
+def filter_day_data_by_prize(df_dia: pd.DataFrame, dia_num: int) -> pd.DataFrame:
+    """
+    Filtra dados de um dia específico aplicando a regra de prêmio.
+    
+    Args:
+        df_dia: DataFrame com dados de um único dia
+        dia_num: Número do dia (1-5)
+    
+    Returns:
+        DataFrame filtrado
+    """
+    if dia_num <= 2:
+        return df_dia  # Todos os prêmios
+    else:
+        # Somente 1° prêmio ou legado
+        if 'premio' in df_dia.columns:
+            return df_dia[(df_dia['premio'] == 1) | (df_dia['premio'] == 0)]
+        return df_dia
+
 def get_day_color(day_number: int) -> dict:
     """
     Retorna as informações de cor para um número de dia específico.
@@ -139,6 +204,7 @@ def get_day_color(day_number: int) -> dict:
 def get_grupo_days(df: pd.DataFrame, loteria: str, grupo: int) -> list:
     """
     Retorna os números dos dias (1-5) em que um grupo específico apareceu.
+    Aplica a regra de prêmio: dias 1-2 todos, dias 3-5 só 1° prêmio.
     Se o grupo apareceu múltiplas vezes no mesmo dia, retorna o dia repetido.
     
     Args:
@@ -149,13 +215,14 @@ def get_grupo_days(df: pd.DataFrame, loteria: str, grupo: int) -> list:
     Returns:
         Lista de números de dias (1-5), podendo ter repetições se apareceu várias vezes
     """
-    df_5dias = filter_5_day_cycle(df, loteria)
+    # Usar filter com regra de prêmio
+    df_filtrado = filter_by_day_prize_rules(df, loteria)
     
-    if len(df_5dias) == 0:
+    if len(df_filtrado) == 0:
         return []
     
     # Filtrar pelo grupo
-    df_grupo = df_5dias[df_5dias['grupo'] == grupo]
+    df_grupo = df_filtrado[df_filtrado['grupo'] == grupo]
     
     if len(df_grupo) == 0:
         return []
@@ -206,6 +273,11 @@ def process_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df['grupo'] = pd.to_numeric(df['grupo'], errors='coerce').fillna(0).astype(int)
     df['centena'] = pd.to_numeric(df['centena'], errors='coerce').fillna(0).astype(int)
     df['milhar'] = pd.to_numeric(df['milhar'], errors='coerce').fillna(0).astype(int)
+    
+    # Garantir coluna premio
+    if 'premio' not in df.columns:
+        df['premio'] = 0
+    df['premio'] = pd.to_numeric(df['premio'], errors='coerce').fillna(0).astype(int)
     
     # Normalizar loteria
     df['loteria'] = df['loteria'].str.strip()

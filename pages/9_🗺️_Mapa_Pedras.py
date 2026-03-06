@@ -93,7 +93,8 @@ if 'dados' not in st.session_state or st.session_state.dados is None:
     st.stop()
 
 from modules.data_loader import (
-    DIA_CORES, filter_5_day_cycle, get_last_5_unique_dates, get_day_color
+    DIA_CORES, filter_5_day_cycle, get_last_5_unique_dates, get_day_color,
+    filter_by_day_prize_rules, filter_day_data_by_prize
 )
 from modules import statistics as stats
 
@@ -121,8 +122,10 @@ st.markdown("""
 
 st.divider()
 
-# Filtrar dados - apenas últimos 5 dias
+# Filtrar dados - últimos 5 dias (sem regra de prêmio para visualização geral)
 df_5dias = filter_5_day_cycle(df, loteria_sel)
+# Filtrar dados com regra de prêmio para análises
+df_5dias_filtered = filter_by_day_prize_rules(df, loteria_sel)
 datas_5dias = get_last_5_unique_dates(df, loteria_sel)
 
 if len(df_5dias) == 0:
@@ -142,7 +145,7 @@ def get_total_freq(df, tipo='milhar'):
     return freq
 
 def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
-    """Frequência do primeiro dígito (pedra) por dia"""
+    """Frequência do primeiro dígito (pedra) por dia, com regra de prêmio"""
     freq_by_day = {dia: {d: 0 for d in range(10)} for dia in range(1, 6)}
     col = 'milhar' if tipo == 'milhar' else 'centena'
     datas = get_last_5_unique_dates(df_full, loteria)
@@ -153,9 +156,12 @@ def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
         dia_num = idx + 1
         df_dia = df[df['data'].dt.date == data]
         
+        # Aplicar regra de prêmio
+        df_dia = filter_day_data_by_prize(df_dia, dia_num)
+        
         for val in df_dia[col]:
-            val_str = str(val).zfill(4 if tipo == 'milhar' else 3)  # Garantir formato correto
-            first_digit = int(val_str[0])  # Extrair apenas o primeiro dígito (pedra)
+            val_str = str(val).zfill(4 if tipo == 'milhar' else 3)
+            first_digit = int(val_str[0])
             freq_by_day[dia_num][first_digit] += 1
     
     return freq_by_day
@@ -182,8 +188,8 @@ with col1:
         st.markdown("**🟡 ALTAS**")
         st.caption("7, 8, 9")
     
-    # Grid de frequências
-    freq_milhar = get_total_freq(df_5dias, 'milhar')
+    # Grid de frequências (usa dados filtrados com regra de prêmio)
+    freq_milhar = get_total_freq(df_5dias_filtered, 'milhar')
     max_freq = max(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 1
     
     st.markdown("#### Frequência Total por Dígito")
@@ -230,7 +236,7 @@ with col2:
         st.markdown("**🟡 ALTAS**")
         st.caption("7, 8, 9")
     
-    freq_centena = get_total_freq(df_5dias, 'centena')
+    freq_centena = get_total_freq(df_5dias_filtered, 'centena')
     max_freq_c = max(freq_centena.values()) if sum(freq_centena.values()) > 0 else 1
     
     st.markdown("#### Frequência Total por Dígito")
@@ -313,7 +319,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown("### 🎲 Casas de pedras — Milhar")
     
-    freq_m = get_total_freq(df_5dias, 'milhar')
+    freq_m = get_total_freq(df_5dias_filtered, 'milhar')
     baixas = [d for d in [0,1,2,3] if freq_m[d] > 0]
     medias = [d for d in [4,5,6] if freq_m[d] > 0]
     altas = [d for d in [7,8,9] if freq_m[d] > 0]
@@ -328,7 +334,7 @@ with col1:
 with col2:
     st.markdown("### 🎲 Casas de pedras — Centena")
     
-    freq_c = get_total_freq(df_5dias, 'centena')
+    freq_c = get_total_freq(df_5dias_filtered, 'centena')
     baixas_c = [d for d in [0,1,2,3] if freq_c[d] > 0]
     medias_c = [d for d in [4,5,6] if freq_c[d] > 0]
     altas_c = [d for d in [7,8,9] if freq_c[d] > 0]

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS resultados (
     centena INTEGER NOT NULL,
     milhar INTEGER NOT NULL,
     animal TEXT,
+    premio INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
     
     -- Constraint para evitar duplicatas
