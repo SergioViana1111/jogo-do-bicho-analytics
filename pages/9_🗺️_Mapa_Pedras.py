@@ -166,102 +166,84 @@ def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
     
     return freq_by_day
 
-# Mapa de Pedras - Milhar e Centena lado a lado
+# Renderizador do novo grid visual (Padrão Cliente)
+def render_pedras_grid(titulo, freq_by_day):
+    html = f'''
+    <div style="font-family: sans-serif; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; background: white;">
+        <!-- Header -->
+        <div style="background-color: #111; color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 16px; letter-spacing: 1px;">
+            {titulo}
+        </div>
+        
+        <!-- Categorias -->
+        <table style="width: 100%; border-collapse: collapse; text-align: center;">
+            <tr>
+                <th colspan="4" style="background-color: #e8f5e9; color: #2e7d32; font-size: 12px; padding: 8px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd;">PEDRAS<br>BAIXAS</th>
+                <th colspan="3" style="background-color: #eeeeee; color: #424242; font-size: 12px; padding: 8px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd;">PEDRAS<br>MÉDIAS</th>
+                <th colspan="3" style="background-color: #e3f2fd; color: #1565c0; font-size: 12px; padding: 8px; border-bottom: 1px solid #ddd;">PEDRAS<br>ALTAS</th>
+            </tr>
+            <tr>
+                <th colspan="4" style="background-color: #e8f5e9; color: #333; border-right: 1px solid #ddd; padding: 4px; font-size: 11px; border-bottom: 1px solid #ddd;">0, 1, 2, 3</th>
+                <th colspan="3" style="background-color: #eeeeee; color: #333; border-right: 1px solid #ddd; padding: 4px; font-size: 11px; border-bottom: 1px solid #ddd;">4, 5, 6</th>
+                <th colspan="3" style="background-color: #e3f2fd; color: #333; padding: 4px; font-size: 11px; border-bottom: 1px solid #ddd;">7, 8, 9</th>
+            </tr>
+    '''
+    
+    # Render linhas (Dias 1 a 5)
+    for dia in range(1, 6):
+        html += '<tr>'
+        for digito in range(10):
+            # Cores de fundo (exatas da imagem)
+            if digito <= 3:
+                bg = "#81c784" # Verde
+                color = "#1b5e20"
+            elif digito <= 6:
+                bg = "#424242" # Cinza escuro
+                color = "#ffffff"
+            else:
+                bg = "#64b5f6" # Azul
+                color = "#0d47a1"
+                
+            border_right = "border-right: 1px solid rgba(255,255,255,0.3);" if digito in [3, 6] else "border-right: 1px solid rgba(255,255,255,0.1);"
+            border_bottom = "border-bottom: 1px solid rgba(255,255,255,0.1);"
+            
+            pontos = freq_by_day.get(dia, {}).get(digito, 0)
+            
+            dots_html = ""
+            for _ in range(pontos):
+                dots_html += '<span style="display: inline-block; width: 10px; height: 10px; background-color: #ef5350; border-radius: 50%; border: 1.5px solid white; margin: 0 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></span>'
+
+            # Estilo da célula: layout flex pra colocar os pontos no topo e o número no centro
+            html += f'''
+                <td style="background-color: {bg}; color: {color}; height: 60px; position: relative; padding: 0; {border_right} {border_bottom}">
+                    <div style="position: absolute; top: 4px; left: 0; right: 0; text-align: center; height: 12px; display: flex; justify-content: center; align-items: center;">
+                        {dots_html}
+                    </div>
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; font-weight: bold; font-size: 16px;">
+                        {digito}
+                    </div>
+                </td>
+            '''
+        html += '</tr>'
+        
+    html += '''
+        </table>
+    </div>
+    '''
+    return html
+
+# Calcular dados de frequência diária
+freq_milhar_by_day = get_digit_freq_by_day(df_5dias, df, loteria_sel, 'milhar')
+freq_centena_by_day = get_digit_freq_by_day(df_5dias, df, loteria_sel, 'centena')
+
+# Mapa de Pedras - Milhar e Centena lado a lado (estilo cliente)
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("""
-    <div class="pedra-box">
-        <div class="pedra-header">PEDRAS DE MILHAR (5 DIAS)</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Labels das categorias
-    cat_col1, cat_col2, cat_col3 = st.columns(3)
-    with cat_col1:
-        st.markdown("**🔵 BAIXAS**")
-        st.caption("0, 1, 2, 3")
-    with cat_col2:
-        st.markdown("**🟢 MÉDIAS**")
-        st.caption("4, 5, 6")
-    with cat_col3:
-        st.markdown("**🟡 ALTAS**")
-        st.caption("7, 8, 9")
-    
-    # Grid de frequências (usa dados filtrados com regra de prêmio)
-    freq_milhar = get_total_freq(df_5dias_filtered, 'milhar')
-    max_freq = max(freq_milhar.values()) if sum(freq_milhar.values()) > 0 else 1
-    
-    st.markdown("#### Frequência Total por Dígito")
-    
-    cols = st.columns(10)
-    for digit in range(10):
-        with cols[digit]:
-            freq = freq_milhar[digit]
-            # Cor baseada na categoria
-            if digit <= 3:
-                bg = "#e3f2fd"
-                color = "#1565c0"
-            elif digit <= 6:
-                bg = "#c8e6c9"
-                color = "#2e7d32"
-            else:
-                bg = "#ffe082"
-                color = "#f57f17"
-            
-            st.markdown(f"""
-            <div style="background: {bg}; color: {color}; padding: 15px 10px; 
-                        text-align: center; border-radius: 5px; 
-                        font-weight: bold; font-size: 1.2rem;">
-                {digit}<br><span style="font-size: 0.8rem;">({freq})</span>
-            </div>
-            """, unsafe_allow_html=True)
+    st.markdown(render_pedras_grid("PEDRAS DE MILHAR", freq_milhar_by_day), unsafe_allow_html=True)
 
 with col2:
-    st.markdown("""
-    <div class="pedra-box">
-        <div class="pedra-header">PEDRAS DE CENTENA (5 DIAS)</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Labels das categorias
-    cat_col1, cat_col2, cat_col3 = st.columns(3)
-    with cat_col1:
-        st.markdown("**🔵 BAIXAS**")
-        st.caption("0, 1, 2, 3")
-    with cat_col2:
-        st.markdown("**🟢 MÉDIAS**")
-        st.caption("4, 5, 6")
-    with cat_col3:
-        st.markdown("**🟡 ALTAS**")
-        st.caption("7, 8, 9")
-    
-    freq_centena = get_total_freq(df_5dias_filtered, 'centena')
-    max_freq_c = max(freq_centena.values()) if sum(freq_centena.values()) > 0 else 1
-    
-    st.markdown("#### Frequência Total por Dígito")
-    
-    cols = st.columns(10)
-    for digit in range(10):
-        with cols[digit]:
-            freq = freq_centena[digit]
-            if digit <= 3:
-                bg = "#e3f2fd"
-                color = "#1565c0"
-            elif digit <= 6:
-                bg = "#c8e6c9"
-                color = "#2e7d32"
-            else:
-                bg = "#ffe082"
-                color = "#f57f17"
-            
-            st.markdown(f"""
-            <div style="background: {bg}; color: {color}; padding: 15px 10px; 
-                        text-align: center; border-radius: 5px; 
-                        font-weight: bold; font-size: 1.2rem;">
-                {digit}<br><span style="font-size: 0.8rem;">({freq})</span>
-            </div>
-            """, unsafe_allow_html=True)
+    st.markdown(render_pedras_grid("PEDRAS DE CENTENA", freq_centena_by_day), unsafe_allow_html=True)
 
 st.divider()
 
