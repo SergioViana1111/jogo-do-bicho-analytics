@@ -144,9 +144,11 @@ def get_total_freq(df, tipo='milhar'):
     
     return freq
 
-def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
-    """Frequência do primeiro dígito (pedra) por dia, com regra de prêmio"""
-    freq_by_day = {dia: {d: 0 for d in range(10)} for dia in range(1, 6)}
+def get_digit_presence_by_day(df, df_full, loteria, tipo='milhar'):
+    """Presença binária do primeiro dígito (pedra) por dia, com regra de prêmio.
+    Retorna dict {digito: set_de_dias} indicando em quais dias o dígito apareceu.
+    Não conta quantidade, apenas se apareceu (binário)."""
+    presence = {d: set() for d in range(10)}
     col = 'milhar' if tipo == 'milhar' else 'centena'
     datas = get_last_5_unique_dates(df_full, loteria)
     
@@ -162,12 +164,14 @@ def get_digit_freq_by_day(df, df_full, loteria, tipo='milhar'):
         for val in df_dia[col]:
             val_str = str(val).zfill(4 if tipo == 'milhar' else 3)
             first_digit = int(val_str[0])
-            freq_by_day[dia_num][first_digit] += 1
+            presence[first_digit].add(dia_num)
     
-    return freq_by_day
+    return presence
 
-# Renderizador do novo grid visual (Padrão Cliente) - MINIFICADO
-def render_pedras_grid(titulo, freq_by_day):
+# Renderizador do grid visual com indicadores coloridos por dia (binário)
+def render_pedras_grid(titulo, presence_by_digit):
+    """Renderiza grid de pedras com bolinhas coloridas por dia.
+    presence_by_digit: dict {digito: set_de_dias} indicando em quais dias cada dígito apareceu."""
     parts = []
     parts.append(f'<div style="font-family: sans-serif; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; background: white;">')
     parts.append(f'<div style="background-color: #111; color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 16px; letter-spacing: 1px;">{titulo}</div>')
@@ -175,48 +179,49 @@ def render_pedras_grid(titulo, freq_by_day):
     parts.append('<tr><th colspan="4" style="background-color: #e8f5e9; color: #2e7d32; font-size: 12px; padding: 8px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd;">PEDRAS<br>BAIXAS</th><th colspan="3" style="background-color: #eeeeee; color: #424242; font-size: 12px; padding: 8px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd;">PEDRAS<br>MÉDIAS</th><th colspan="3" style="background-color: #e3f2fd; color: #1565c0; font-size: 12px; padding: 8px; border-bottom: 1px solid #ddd;">PEDRAS<br>ALTAS</th></tr>')
     parts.append('<tr><th colspan="4" style="background-color: #e8f5e9; color: #333; border-right: 1px solid #ddd; padding: 4px; font-size: 11px; border-bottom: 1px solid #ddd;">0, 1, 2, 3</th><th colspan="3" style="background-color: #eeeeee; color: #333; border-right: 1px solid #ddd; padding: 4px; font-size: 11px; border-bottom: 1px solid #ddd;">4, 5, 6</th><th colspan="3" style="background-color: #e3f2fd; color: #333; padding: 4px; font-size: 11px; border-bottom: 1px solid #ddd;">7, 8, 9</th></tr>')
     
-    for dia in range(1, 6):
-        parts.append('<tr>')
-        for digito in range(10):
-            if digito <= 3:
-                bg, color = "#81c784", "#1b5e20"
-            elif digito <= 6:
-                bg, color = "#424242", "#ffffff"
-            else:
-                bg, color = "#64b5f6", "#0d47a1"
-                
-            border_right = "border-right: 1px solid rgba(255,255,255,0.3);" if digito in [3, 6] else "border-right: 1px solid rgba(255,255,255,0.1);"
-            border_bottom = "border-bottom: 1px solid rgba(255,255,255,0.1);"
+    # Uma única linha com todos os dígitos, mostrando bolinhas coloridas por dia
+    parts.append('<tr>')
+    for digito in range(10):
+        if digito <= 3:
+            bg, color = "#81c784", "#1b5e20"
+        elif digito <= 6:
+            bg, color = "#424242", "#ffffff"
+        else:
+            bg, color = "#64b5f6", "#0d47a1"
             
-            pontos = freq_by_day.get(dia, {}).get(digito, 0)
-            dots = "".join(['<span style="display: inline-block; width: 10px; height: 10px; background-color: #ef5350; border-radius: 50%; border: 1.5px solid white; margin: 0 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></span>' for _ in range(pontos)])
-            
-            parts.append(f'<td style="background-color: {bg}; color: {color}; height: 60px; position: relative; padding: 0; {border_right} {border_bottom}"><div style="position: absolute; top: 4px; left: 0; right: 0; text-align: center; height: 12px; display: flex; justify-content: center; align-items: center;">{dots}</div><div style="display: flex; justify-content: center; align-items: center; height: 100%; font-weight: bold; font-size: 16px;">{digito}</div></td>')
-        parts.append('</tr>')
+        border_right = "border-right: 1px solid rgba(255,255,255,0.3);" if digito in [3, 6] else "border-right: 1px solid rgba(255,255,255,0.1);"
+        
+        # Gerar bolinhas coloridas na ordem DIA 1 → DIA 5
+        dias_presente = presence_by_digit.get(digito, set())
+        dots = ""
+        for dia in range(1, 6):
+            if dia in dias_presente:
+                cor_dia = DIA_CORES[dia]['cor']
+                dots += f'<span style="display: inline-block; width: 10px; height: 10px; background-color: {cor_dia}; border-radius: 50%; border: 1.5px solid white; margin: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.3);" title="DIA {dia}"></span>'
+        
+        parts.append(f'<td style="background-color: {bg}; color: {color}; height: 70px; position: relative; padding: 0; {border_right} border-bottom: 1px solid rgba(255,255,255,0.1);"><div style="position: absolute; top: 4px; left: 0; right: 0; text-align: center; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 1px;">{dots}</div><div style="display: flex; justify-content: center; align-items: center; height: 100%; font-weight: bold; font-size: 18px; padding-top: 10px;">{digito}</div></td>')
+    parts.append('</tr>')
         
     parts.append('</table></div>')
     return "".join(parts)
 
-# Calcular dados de frequência diária
-freq_milhar_by_day = get_digit_freq_by_day(df_5dias, df, loteria_sel, 'milhar')
-freq_centena_by_day = get_digit_freq_by_day(df_5dias, df, loteria_sel, 'centena')
+# Calcular presença binária por dia
+presence_milhar = get_digit_presence_by_day(df_5dias, df, loteria_sel, 'milhar')
+presence_centena = get_digit_presence_by_day(df_5dias, df, loteria_sel, 'centena')
 
 # Mapa de Pedras - Milhar e Centena lado a lado (estilo cliente)
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown(render_pedras_grid("PEDRAS DE MILHAR", freq_milhar_by_day), unsafe_allow_html=True)
+    st.markdown(render_pedras_grid("PEDRAS DE MILHAR", presence_milhar), unsafe_allow_html=True)
 
 with col2:
-    st.markdown(render_pedras_grid("PEDRAS DE CENTENA", freq_centena_by_day), unsafe_allow_html=True)
+    st.markdown(render_pedras_grid("PEDRAS DE CENTENA", presence_centena), unsafe_allow_html=True)
 
 st.divider()
 
-# Análise por Dia
-st.subheader("📊 Frequência de Pedras por Dia")
-
-freq_milhar_by_day = get_digit_freq_by_day(df_5dias, df, loteria_sel, 'milhar')
-freq_centena_by_day = get_digit_freq_by_day(df_5dias, df, loteria_sel, 'centena')
+# Análise por Dia — Presença de pedras
+st.subheader("📊 Presença de Pedras por Dia")
 
 # Criar tabs para cada dia
 tabs = st.tabs([f"{DIA_CORES[d]['emoji']} DIA {d}" for d in range(1, 6)])
@@ -237,11 +242,10 @@ for idx, tab in enumerate(tabs):
             </div>
             """, unsafe_allow_html=True)
             
-            freq_m = freq_milhar_by_day[dia_num]
             for digit in range(10):
-                count = freq_m[digit]
-                bars = "█" * count if count > 0 else "—"
-                st.markdown(f"`{digit}` = {bars} ({count})")
+                presente = dia_num in presence_milhar.get(digit, set())
+                status = f"<span style='color:{cor_info['cor']};'>●</span> Presente" if presente else "—"
+                st.markdown(f"`{digit}` = {status}", unsafe_allow_html=True)
         
         with col2:
             st.markdown(f"""
@@ -252,11 +256,10 @@ for idx, tab in enumerate(tabs):
             </div>
             """, unsafe_allow_html=True)
             
-            freq_c = freq_centena_by_day[dia_num]
             for digit in range(10):
-                count = freq_c[digit]
-                bars = "█" * count if count > 0 else "—"
-                st.markdown(f"`{digit}` = {bars} ({count})")
+                presente = dia_num in presence_centena.get(digit, set())
+                status = f"<span style='color:{cor_info['cor']};'>●</span> Presente" if presente else "—"
+                st.markdown(f"`{digit}` = {status}", unsafe_allow_html=True)
 
 st.divider()
 
@@ -292,5 +295,20 @@ with col2:
     
     st.markdown(f"**Presentes:** 🔵 ({','.join(map(str, baixas_c)) or '—'}), 🟢 ({','.join(map(str, medias_c)) or '—'}), 🟡 ({','.join(map(str, altas_c)) or '—'})")
     st.markdown(f"**Ausentes:** 🔵 ({','.join(map(str, ausentes_baixas_c)) or '—'}), 🟢 ({','.join(map(str, ausentes_medias_c)) or '—'}), 🟡 ({','.join(map(str, ausentes_altas_c)) or '—'})")
+
+st.divider()
+st.markdown("""
+<div style="background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 15px; margin-top: 10px;">
+    <div style="color: #aaa; font-size: 13px; font-weight: bold; margin-bottom: 10px;">🎨 LEGENDA DE CORES — Significado dos indicadores:</div>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 6px;"><span style="display:inline-block;width:12px;height:12px;background:#FF0000;border-radius:50%;border:1.5px solid white;"></span><span style="color:#ccc; font-size: 13px;">DIA 1 (mais recente)</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span style="display:inline-block;width:12px;height:12px;background:#00C853;border-radius:50%;border:1.5px solid white;"></span><span style="color:#ccc; font-size: 13px;">DIA 2</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span style="display:inline-block;width:12px;height:12px;background:#2196F3;border-radius:50%;border:1.5px solid white;"></span><span style="color:#ccc; font-size: 13px;">DIA 3</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span style="display:inline-block;width:12px;height:12px;background:#FF9800;border-radius:50%;border:1.5px solid white;"></span><span style="color:#ccc; font-size: 13px;">DIA 4</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span style="display:inline-block;width:12px;height:12px;background:#333333;border-radius:50%;border:1.5px solid white;"></span><span style="color:#ccc; font-size: 13px;">DIA 5 (mais antigo)</span></div>
+    </div>
+    <div style="color: #888; font-size: 11px; margin-top: 10px;">Cada bolinha indica que a pedra <strong>apareceu</strong> naquele dia. Não indica quantidade — apenas presença.</div>
+</div>
+""", unsafe_allow_html=True)
 
 st.caption("⚠️ Análise de pedras (dígitos) nos últimos 5 dias da loteria selecionada. Janela fixa de 5 dias conforme escopo.")
