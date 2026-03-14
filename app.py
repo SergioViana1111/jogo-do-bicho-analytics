@@ -167,6 +167,19 @@ st.markdown("""
         background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
     }
     
+    /* Database status indicator */
+    .db-status {
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    .db-cloud { background-color: rgba(0, 200, 83, 0.2); color: #00C853; border: 1px solid #00C853; }
+    .db-local { background-color: rgba(255, 152, 0, 0.2); color: #FF9800; border: 1px solid #FF9800; }
+    .db-error { background-color: rgba(244, 67, 54, 0.2); color: #f44336; border: 1px solid #f44336; }
+    
     /* Alert box */
     .info-box {
         background: rgba(0, 200, 83, 0.1);
@@ -210,6 +223,24 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Sidebar Status
+with st.sidebar:
+    st.markdown("### 🛠️ Status do Sistema")
+    
+    from modules.database import _is_supabase_available
+    is_cloud = _is_supabase_available()
+    source = st.session_state.get('_supabase_source', 'None')
+    has_error = st.session_state.get('_supabase_active_error', False)
+    
+    if is_cloud and not has_error:
+        st.markdown(f'<div class="db-status db-cloud">☁️ Cloud (Supabase via {source})</div>', unsafe_allow_html=True)
+    elif has_error:
+        st.markdown('<div class="db-status db-error">⚠️ Erro de Conexão (Fallback p/ Local)</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="db-status db-local">🏠 Local (SQLite)</div>', unsafe_allow_html=True)
+    
+    st.divider()
 
 # Header
 st.markdown("""

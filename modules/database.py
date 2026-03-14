@@ -14,28 +14,45 @@ import streamlit as st
 # ========================
 
 def _get_supabase_client():
-    """Retorna cliente Supabase se configurado"""
-    try:
-        from supabase import create_client, Client
-        
-        # Tentar obter credenciais do secrets do Streamlit
-        url = st.secrets.get("SUPABASE_URL") if hasattr(st, 'secrets') else os.environ.get("SUPABASE_URL")
-        key = st.secrets.get("SUPABASE_KEY") if hasattr(st, 'secrets') else os.environ.get("SUPABASE_KEY")
-        
-        if url and key:
-            return create_client(url, key)
-    except Exception as e:
-        print(f"[DB] Supabase não disponível: {e}")
+    """Retorna cliente Supabase tentando segredos do Streamlit e variáveis de ambiente"""
+    url = None
+    key = None
     
-    return None
+    # 1. Tentar Streamlit Secrets (prioridade)
+    try:
+        if hasattr(st, 'secrets'):
+            url = st.secrets.get("SUPABASE_URL")
+            key = st.secrets.get("SUPABASE_KEY")
+            if url and key:
+                from supabase import create_client
+                return create_client(url, key), "Secrets"
+    except Exception:
+        pass
+        
+    # 2. Tentar Variáveis de Ambiente (fallback para Render/Local)
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    
+    if url and key:
+        try:
+            from supabase import create_client
+            return create_client(url, key), "Env Var"
+        except Exception as e:
+            print(f"[DB] Erro ao criar cliente Supabase via Env Var: {e}")
+    
+    return None, None
 
 def _is_supabase_available():
-    """Verifica se Supabase está configurado"""
+    """Verifica se Supabase está configurado e ativo"""
     if '_supabase_available' not in st.session_state:
-        client = _get_supabase_client()
+        client, source = _get_supabase_client()
         st.session_state._supabase_available = client is not None
         if client:
             st.session_state._supabase_client = client
+            st.session_state._supabase_source = source
+            print(f"[DB] Conectado ao Supabase via {source}")
+        else:
+            st.session_state._supabase_source = "None"
     return st.session_state._supabase_available
 
 # ========================
@@ -245,7 +262,10 @@ def load_all_data() -> pd.DataFrame:
             if 'fallback_warned' not in st.session_state:
                 st.warning("⚠️ Não foi possível conectar ao banco online. Usando dados locais (SQLite).")
                 st.session_state.fallback_warned = True
+            st.session_state._supabase_active_error = True
             return _load_sqlite()
+        
+        st.session_state._supabase_active_error = False
         return df
     else:
         return _load_sqlite()
